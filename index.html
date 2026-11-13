@@ -60,6 +60,8 @@
   .punten { font-weight: 700; color: var(--goed); }
   .bron-info { font-size: 14px; margin-top: 12px; line-height: 1.5; }
   .bron-info a { color: var(--accent-donker); }
+  .hc-blok { background: var(--papier); border-left: 3px solid var(--accent); padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; }
+  .hc-chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--papier); border: 1px solid var(--lijn); margin: 2px 4px 0 0; }
   #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; z-index: 2000; cursor: zoom-out; }
   #zoom img { max-width: 96vw; max-height: 96vh; }
 
@@ -105,8 +107,9 @@
       <p>Je krijgt een historische bron te zien. Raad het jaartal en klik op de kaart waar het was. Hoe dichterbij, hoe meer punten.</p>
       <label for="kies-tijdvak">Tijdvak</label>
       <select id="kies-tijdvak"></select>
-      <label for="kies-label">Thema / label</label>
-      <select id="kies-label"></select>
+      <label for="kies-hc">Historische context (syllabus 2027)</label>
+      <select id="kies-hc"></select>
+      <div id="hc-uitleg" class="zacht" style="margin-top:6px"></div>
       <div class="rij">
         <div>
           <label for="kies-rondes">Aantal rondes</label>
@@ -233,9 +236,10 @@
               </div>
               <div>
                 <label for="f-labels">Labels (komma's ertussen)</label>
-                <input id="f-labels" placeholder="bijv. WOII, klas 3">
+                <input id="f-labels" placeholder="bijv. HC China of -HC China">
               </div>
             </div>
+            <div class="zacht" id="f-hc" style="margin-top:6px"></div>
             <label for="f-plaats">Plaats — zoek of klik op de kaart</label>
             <div class="rij">
               <input id="f-plaats" placeholder="bijv. Rotterdam">
@@ -342,6 +346,147 @@ const KLEIO_BEELDTYPES = [
   { id: 190, naam: 'Foto' }, { id: 191, naam: 'Tekening of schilderij' }, { id: 189, naam: 'Spotprent, cartoon of poster' },
   { id: 196, naam: 'Object' }, { id: 193, naam: 'Kaart' }, { id: 407, naam: 'Infographic' }, { id: 188, naam: 'Afbeelding (overig)' },
 ];
+
+/* ---------------------------------------------------------------------
+   HISTORISCHE CONTEXTEN (syllabus centraal examen geschiedenis 2027, CvTE)
+   Een bron hoort bij een deelvraag als het jaartal binnen de periode valt ÉN
+   (de plek in het gebied ligt OF de tekst een van de trefwoorden bevat).
+   Handmatig: geef een bron het label "HC China" om hem altijd mee te nemen,
+   of "-HC China" om hem uit te sluiten. Trefwoorden: hoofdletters maken niet uit;
+   een trefwoord matcht ook als begin van een woord ("verlicht" → "verlichte").
+   --------------------------------------------------------------------- */
+// Gebieden: Kleio-regionamen en rechthoeken [zuid, noord, west, oost] voor eigen coördinaten
+const GEBIEDEN = {
+  groot_brittannie: { namen: ['Groot-Brittannië', 'Ierland'], vakken: [[49.8, 59, -8.5, 2]] },
+  noord_amerika: { namen: ['Verenigde Staten', 'Noord-Amerika'], vakken: [[25, 47.5, -85, -66]] },
+  caribisch: { namen: ['Caraïbisch Gebied', 'Cuba'], vakken: [[10, 27, -86, -59]] },
+  india: { namen: ['India', 'Bangladesh'], vakken: [[6, 36, 68, 92.5]] },
+  duitsland: { namen: ['Duitsland'], vakken: [[47.2, 51.0, 5.9, 15.1], [51.0, 55.1, 7.1, 15.1]] },
+  nederland: { namen: ['Nederland', 'Drenthe', 'Flevoland', 'Friesland', 'Gelderland', 'Groningen', 'Limburg', 'Noord-Brabant', 'Noord-Holland', 'Overijssel', 'Utrecht', 'Zeeland', 'Zuid-Holland'], vakken: [[51.25, 53.6, 3.3, 7.2], [50.75, 51.25, 5.6, 6.1]] },
+  lage_landen: { namen: ['Nederland', 'Drenthe', 'Flevoland', 'Friesland', 'Gelderland', 'Groningen', 'Limburg', 'Noord-Brabant', 'Noord-Holland', 'Overijssel', 'Utrecht', 'Zeeland', 'Zuid-Holland', 'België'], vakken: [[50.2, 53.6, 2.4, 7.2]] },
+  frankrijk: { namen: ['Frankrijk'], vakken: [[42.3, 51.1, -4.8, 8.2]] },
+  china: { namen: ['China'], vakken: [[18, 54, 73, 122], [18, 33, 122, 135], [40, 54, 122, 135]] },
+};
+
+const HISTORISCHE_CONTEXTEN = [
+  { id: 'brits-rijk', naam: 'HC Brits rijk', niveau: 'havo', titel: 'Het Britse rijk', van: 1585, tot: 1900,
+    deelvragen: [
+      { vraag: 'Op welke manieren ontwikkelden zich de Engelse koloniën in de Amerika\'s?', van: 1585, tot: 1833,
+        gebied: ['noord_amerika', 'caribisch'],
+        // let op: algemene woorden als 'plantage' of 'slavenhandel' staan er bewust niet in (die passen ook bij Nederlandse bronnen)
+        trefwoorden: ['pilgrim fathers', 'virginia', 'jamestown', 'plymouth', 'dertien koloniën', 'barbados', 'jamaica', 'royal african company', 'britse slavenhandel', 'engelse slavenhandel', 'abolition', 'wilberforce', 'boston tea party', 'onafhankelijkheidsverklaring', 'declaration of independence'] },
+      { vraag: 'Waardoor werd India in de 19e eeuw de belangrijkste kolonie binnen het Britse Rijk?', van: 1765, tot: 1885,
+        gebied: ['india'],
+        trefwoorden: ['east india company', 'engelse oost-indische compagnie','mogol', 'allahabad', 'sepoy', 'brits-indi', 'keizerin van india', 'suezkanaal', 'indian national congress', 'royal navy'] },
+      { vraag: 'Welke rol speelden de koloniën in sociaal-economische ontwikkelingen in Groot-Brittannië?', van: 1750, tot: 1900,
+        gebied: ['groot_brittannie'],
+        trefwoorden: ['spinning jenny', 'james watt', 'manchester', 'lancashire', 'reform bill', 'factory act', 'robert owen', 'great exhibition', 'crystal palace', 'werkplaats van de wereld', 'victoriaans'] },
+    ] },
+  { id: 'duitsland-havo', naam: 'HC Duitsland (havo)', niveau: 'havo', titel: 'Duitsland in Europa', van: 1918, tot: 1991,
+    deelvragen: 'duitsland' },
+  { id: 'nederland', naam: 'HC Nederland', niveau: 'havo', titel: 'Nederland', van: 1948, tot: 2008,
+    deelvragen: [
+      { vraag: 'Waardoor veranderden de maatschappelijke verhoudingen in Nederland van 1948 tot 1978?', van: 1948, tot: 1978,
+        gebied: ['nederland'],
+        trefwoorden: ['marshallhulp', 'marshallplan', 'wederopbouw', 'verzuiling', 'ontzuiling', 'babyboom', 'aow', 'drees', 'verzorgingsstaat', 'aardgas', 'consumptiemaatschappij', 'nozem', 'provo', 'hippie', 'dolle mina', 'man vrouw maatschappij', 'anticonceptiepil', 'gastarbeider', 'indonesi', 'suriname', 'politionele actie', 'molukk', 'oliecrisis', 'autoloze zondag', 'veronica', "d'66", 'emigrant', 'emigratie'] },
+      { vraag: 'Waardoor veranderden de maatschappelijke verhoudingen in Nederland tussen 1978 en 2008?', van: 1978, tot: 2008,
+        gebied: ['nederland'],
+        trefwoorden: ['lubbers', 'poldermodel', 'privatiser', 'verdrag van maastricht', 'schengen', 'kruisraket', 'gidsland', 'srebrenica', 'krakers', 'kraakbeweging', 'punk', 'gabber', 'nederhop', 'gedoogbeleid', 'softdrugs', 'coffeeshop', 'homohuwelijk', 'euthanasie', 'multicultur', 'asielzoeker', 'fortuyn', 'polarisatie', 'inburger'] },
+    ] },
+  { id: 'steden-en-staten', naam: 'HC Steden en staten', niveau: 'vwo', titel: 'Steden en burgers in de Lage Landen', van: 1050, tot: 1700,
+    deelvragen: [
+      { vraag: 'Wat maakte de opkomst van een stedelijke burgerij in de Nederlandse gewesten mogelijk?', van: 1050, tot: 1302,
+        gebied: ['lage_landen'],
+        trefwoorden: ['atrecht', 'arras', 'vlaanderen', 'vlaamse', 'brugge', 'gent', 'ieper', 'stadsrecht', 'poorter', 'koopliedengilde', 'gilde', 'lakennijverheid', 'laken', 'jaarmarkt', 'hanze', 'patrici', 'guldensporenslag'] },
+      { vraag: 'Welke invloed hadden sociaaleconomische en politieke ontwikkelingen op de positie van de stedelijke burgerij in de Nederlandse gewesten?', van: 1302, tot: 1602,
+        gebied: ['lage_landen'],
+        trefwoorden: ['brugge', 'antwerpen', 'koopmansbeurs', 'wisselbrief', 'bonum commune', 'bedelorde', 'begijnhof', 'moderne devotie', 'bourgondi', 'karel v', 'filips ii', 'beeldenstorm', 'alva', 'willem van oranje', 'opstand', 'val van antwerpen', 'tachtigjarige oorlog'] },
+      { vraag: 'In hoeverre bepaalde de burgerij de ontwikkelingen in de Republiek in de Gouden Eeuw?', van: 1602, tot: 1700,
+        gebied: ['lage_landen'],
+        trefwoorden: ['republiek', 'voc', 'wic', 'regent', 'stadhouder', 'gouden eeuw', 'stapelmarkt', 'grachtengordel', 'trekvaart', 'droogmakerij', 'rembrandt', 'johan de witt', 'rampjaar', 'staatsgezind', 'oranjegezind', 'mercantilis'] },
+    ] },
+  { id: 'verlichting', naam: 'HC Verlichting', niveau: 'vwo', titel: 'Verlichting', van: 1650, tot: 1900,
+    deelvragen: [
+      { vraag: 'Welke ideeën ontstonden tijdens de Verlichting over een meer rechtvaardige samenleving?', van: 1650, tot: 1789,
+        gebied: [],
+        trefwoorden: ['verlicht', 'descartes', 'locke', 'newton', 'spinoza', 'rousseau', 'montesquieu', 'voltaire', 'diderot', 'encyclop', 'adam smith', 'sociaal contract', 'trias politica', 'scheiding der machten', 'natuurrecht', 'droit divin', 'absolutis', 'lodewijk xiv', 'zonnekoning', 'versailles', 'frederik de grote', 'catharina de grote', 'jozef ii', 'wetenschappelijke revolutie', 'salon', 'koffiehuis', 'censuur'] },
+      { vraag: 'Hoe werden verlichte ideeën tijdens de democratische revoluties in de Verenigde Staten en Frankrijk in de praktijk gebracht?', van: 1776, tot: 1813,
+        gebied: ['noord_amerika', 'frankrijk'],
+        trefwoorden: ['washington', 'thomas paine', 'common sense', 'onafhankelijkheidsverklaring', 'declaration of independence', 'amerikaanse grondwet', 'franse revolutie', 'bastille', 'staten-generaal', 'lodewijk xvi', 'marie-antoinette', 'derde stand', 'rechten van de mens', 'robespierre', 'jakobijn', 'guillotine', 'schrikbewind', 'olympe de gouges', 'napoleon', 'code napol'] },
+      { vraag: 'In welke mate bepaalden verlichtingsideeën de politieke cultuur in Europa?', van: 1813, tot: 1900,
+        gebied: [],
+        trefwoorden: ['congres van wenen', 'restauratie', 'code napol', 'liberal', 'socialis', 'nationalis', 'feminis', 'confessione', 'thorbecke', 'grondwet van 1848', 'grondwetsherziening', 'belgische opstand', 'afscheiding van belgi', 'karl marx', 'communistisch manifest', 'anarchis', 'sociaaldemocra', 'vakbond', 'coöperatie', 'kiesrecht', 'aletta jacobs', 'sociale kwestie', 'garibaldi', 'bismarck', 'eenwording van italië', 'eenwording van duitsland', 'christelijk-sociaal'] },
+    ] },
+  { id: 'china', naam: 'HC China', niveau: 'vwo', titel: 'China', van: 1842, tot: 2001,
+    deelvragen: [
+      { vraag: 'Waardoor verloor China zijn positie als regionale grootmacht?', van: 1842, tot: 1911,
+        gebied: ['china'],
+        trefwoorden: ['opium', 'qing', 'ongelijke verdrag', 'taiping', 'nian', 'zelfversterking', 'cixi', 'boxer', 'bokser', 'mandarijn', 'keizerrijk china'] },
+      { vraag: 'Waardoor ontstond de Volksrepubliek China?', van: 1912, tot: 1949,
+        gebied: ['china'],
+        trefwoorden: ['sun yat-sen', 'yuan shikai', 'krijgsheer', '4 mei', 'vierde mei', 'chinese communistische partij', 'kuomintang', 'guomindang', 'noordelijke veldtocht', 'chiang kai', 'mantsjoerije', 'manchukuo', 'puyi', 'lange mars', 'mao'] },
+      { vraag: 'Waardoor heeft de Volksrepubliek zich kunnen ontwikkelen tot een grootmacht?', van: 1949, tot: 2001,
+        gebied: ['china'],
+        trefwoorden: ['volksrepubliek', 'mao', 'grote sprong', 'culturele revolutie', 'rode gard', 'rode boekje', 'deng xiaoping', 'vier moderniseringen', 'tiananmen', 'hemelse vrede', 'jiang zemin', 'hongkong', 'macao', 'taiwan', 'wereldhandelsorganisatie'] },
+    ] },
+  { id: 'duitsland-vwo', naam: 'HC Duitsland (vwo)', niveau: 'vwo', titel: 'Duitsland in Europa', van: 1918, tot: 1991,
+    deelvragen: 'duitsland', extraTrefwoorden: ['denazificatie', 'baader', 'meinhof', 'rote armee fraktion', 'links terrorisme'] },
+];
+// Duitsland is (vrijwel) gelijk voor havo en vwo
+const DUITSLAND_DEELVRAGEN = [
+  { vraag: 'Wat leidde tot de opkomst van het nationaalsocialisme en welke gevolgen had dit voor Duitsland en Europa?', van: 1918, tot: 1945,
+    gebied: ['duitsland'],
+    trefwoorden: ['weimar', 'dolkstoot', 'versailles', 'herstelbetaling', 'dawes', 'stresemann', 'hyperinflatie', 'beurskrach', 'nsdap', 'nazi', 'hitler', 'goebbels', 'rijkskanselier', 'rijksdagbrand', 'machtigingswet', 'volksgemeinschaft', 'kristallnacht', 'jodenvervolging', 'antisemitis', 'conferentie van münchen', 'appeasement', 'chamberlain', 'inval in polen', 'bezetting', 'bezetter', 'nsb', 'razzia', 'onderduik', 'westerbork', 'anne frank', 'jodenster', 'februaristaking', 'arbeidsinzet', 'concentratiekamp', 'vernietigingskamp', 'auschwitz', 'holocaust', 'duits'] },
+  { vraag: 'Hoezeer beïnvloedde het ontstaan en het verloop van de Koude Oorlog de geschiedenis van Duitsland na de Tweede Wereldoorlog?', van: 1945, tot: 1961,
+    gebied: ['duitsland'],
+    trefwoorden: ['heimatvertriebene', 'bezettingszone', 'blokkade van berlijn', 'luchtbrug', 'trumandoctrine', 'marshallplan', 'bondsrepubliek', 'brd', 'ddr', 'adenauer', 'wirtschaftswunder', 'ulbricht', 'stasi', 'staatssicherheit', 'warschaupact', 'comecon', 'egks', 'berlijnse muur', 'west-berlijn', 'oost-berlijn', 'oost-duits', 'west-duits'] },
+  { vraag: 'Wat verklaart de hereniging van beide Duitslanden en hun succesvolle integratie in Europa?', van: 1961, tot: 1991,
+    gebied: ['duitsland'],
+    trefwoorden: ['brandt', 'ostpolitik', 'detente', 'honecker', 'gorbatsjov', 'glasnost', 'perestrojka', 'brezjnevdoctrine', 'berlijnse muur', 'val van de muur', 'hereniging', 'kohl', 'checkpoint charlie', 'brd', 'ddr', 'oost-duits', 'west-duits'] },
+];
+HISTORISCHE_CONTEXTEN.forEach(hc => {
+  if (hc.deelvragen === 'duitsland') hc.deelvragen = DUITSLAND_DEELVRAGEN.map(dv => ({ ...dv, trefwoorden: [...dv.trefwoorden, ...(hc.extraTrefwoorden || [])] }));
+});
+
+/* ---- Bepalen bij welke historische context(en) een bron hoort ---- */
+const normaal = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+HISTORISCHE_CONTEXTEN.forEach(hc => hc.deelvragen.forEach(dv => {
+  const delen = dv.trefwoorden.map(w => {
+    const t = normaal(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return t.length <= 4 ? t + '(?![a-z])' : t;   // korte woorden (ddr, voc, mao) alleen als heel woord
+  });
+  dv.patroon = new RegExp('(^|[^a-z0-9])(' + delen.join('|') + ')');
+}));
+function inGebied(b, sleutels) {
+  if (!sleutels || !sleutels.length) return false;
+  const regio = (b.plaats || '').match(/^(.*) \(regio\)$/);   // Kleio: alleen een regio bekend
+  return sleutels.some(k => {
+    const g = GEBIEDEN[k]; if (!g) return false;
+    if (regio) return g.namen.includes(regio[1]);
+    return heeftPlaats(b) && g.vakken.some(([z, n, w, o]) => b.lat >= z && b.lat <= n && b.lng >= w && b.lng <= o);
+  });
+}
+// Geeft [{ hc, dv, nr }] terug: de contexten (en deelvraag) waar de bron bij past
+function contextenVan(b) {
+  if (!Number.isFinite(b.jaar)) return [];
+  const labels = (b.labels || []).map(l => normaal(l).trim());
+  const tekst = normaal([b.titel, b.beschrijving, b.plaats, (b.labels || []).join(' ')].join(' '));
+  const uit = [];
+  for (const hc of HISTORISCHE_CONTEXTEN) {
+    const naam = normaal(hc.naam);
+    if (labels.includes('-' + naam) || labels.includes('- ' + naam)) continue;
+    const handmatig = labels.includes(naam);
+    let gevonden = null;
+    hc.deelvragen.forEach((dv, i) => {
+      if (gevonden || b.jaar < dv.van || b.jaar > dv.tot) return;
+      if (handmatig || inGebied(b, dv.gebied) || dv.patroon.test(tekst)) gevonden = { hc, dv, nr: i + 1 };
+    });
+    if (!gevonden && handmatig) gevonden = { hc, dv: null, nr: null };
+    if (gevonden) uit.push(gevonden);
+  }
+  return uit;
+}
+const jaren = (a, b) => `${jaarTekst(a)}–${jaarTekst(b)}`;
 
 const TIJDVAKKEN = [
   { naam: 'Alle tijdvakken', van: null, tot: null },
@@ -489,28 +634,36 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-naar
    START
    ===================================================================== */
 TIJDVAKKEN.forEach((t, i) => $('#kies-tijdvak').add(new Option(t.naam, i)));
+(() => {
+  const sel = $('#kies-hc');
+  sel.add(new Option('Alle bronnen', ''));
+  ['havo', 'vwo'].forEach(niveau => {
+    const groep = document.createElement('optgroup'); groep.label = niveau;
+    HISTORISCHE_CONTEXTEN.filter(hc => hc.niveau === niveau)
+      .forEach(hc => groep.appendChild(new Option(`${hc.naam} — ${hc.titel} ${jaren(hc.van, hc.tot)}`, hc.id)));
+    sel.appendChild(groep);
+  });
+})();
+const gekozenHC = () => HISTORISCHE_CONTEXTEN.find(hc => hc.id === $('#kies-hc').value) || null;
 function vulStart() {
-  const sel = $('#kies-label'), huidig = sel.value;
-  const labels = [...new Set(bronnen.flatMap(b => b.labels || []))].sort((a, b) => a.localeCompare(b));
-  sel.innerHTML = '';
-  sel.add(new Option('Alle thema\'s', ''));
-  labels.forEach(l => sel.add(new Option(l, l)));
-  if (labels.includes(huidig)) sel.value = huidig;
+  const hc = gekozenHC();
+  $('#hc-uitleg').innerHTML = hc ? '<ol style="margin:4px 0;padding-left:20px">' + hc.deelvragen.map(dv =>
+    `<li>${esc(dv.vraag)} <i>(${jaren(dv.van, dv.tot)})</i></li>`).join('') + '</ol>' : '';
   const n = speelbaar().length;
   $('#start-telling').textContent = `${n} bron${n === 1 ? '' : 'nen'} beschikbaar met deze instellingen.`;
 }
 function speelbaar() {
   const tv = TIJDVAKKEN[+$('#kies-tijdvak').value || 0];
-  const label = $('#kies-label').value;
+  const hc = gekozenHC();
   const metPlaats = $('#kies-plaats').checked;
   const alleenGecontroleerd = $('#kies-gecontroleerd').checked;
   return bronnen.filter(b => b.afbeelding && Number.isFinite(b.jaar)
     && (!alleenGecontroleerd || !b.controleren)
     && (tv.van == null || (b.jaar >= tv.van && b.jaar < tv.tot))
-    && (!label || (b.labels || []).includes(label))
+    && (!hc || contextenVan(b).some(c => c.hc === hc))
     && (!metPlaats || heeftPlaats(b)));
 }
-['#kies-tijdvak', '#kies-label', '#kies-plaats', '#kies-gecontroleerd'].forEach(s => $(s).addEventListener('change', vulStart));
+['#kies-tijdvak', '#kies-hc', '#kies-plaats', '#kies-gecontroleerd'].forEach(s => $(s).addEventListener('change', vulStart));
 
 /* =====================================================================
    SPEL
@@ -536,8 +689,9 @@ function startSpel() {
   const pool = schud(speelbaar());
   if (!pool.length) { alert('Er zijn geen bronnen die passen bij deze instellingen. Voeg bronnen toe via "Bronnen beheren".'); toon('start'); return; }
   const n = Math.max(1, Math.min(+$('#kies-rondes').value || 5, pool.length));
-  const tv = TIJDVAKKEN[+$('#kies-tijdvak').value || 0];
+  const tv = TIJDVAKKEN[+$('#kies-tijdvak').value || 0], hc = gekozenHC();
   if (tv.van != null) bereik = { min: tv.van, max: tv.tot - 1 };
+  else if (hc) bereik = { min: hc.van, max: hc.tot };
   else {
     const jaren = bronnen.filter(b => Number.isFinite(b.jaar)).map(b => b.jaar);
     bereik = {
@@ -598,6 +752,10 @@ $('#knop-raad').addEventListener('click', () => {
   } else r.pp = 0;
 
   const delen = [];
+  const hcs = contextenVan(b), voorkeur = gekozenHC();
+  hcs.sort((x, y) => (y.hc === voorkeur) - (x.hc === voorkeur));
+  if (hcs.length) delen.push('<div class="hc-blok">' + hcs.slice(0, 2).map(c =>
+    `<b>${esc(c.hc.naam)}</b>${c.dv ? ` · deelvraag ${c.nr}: ${esc(c.dv.vraag)} <i>(${jaren(c.dv.van, c.dv.tot)})</i>` : ''}`).join('<br>') + '</div>');
   if (b.beschrijving) delen.push(`<p>${esc(b.beschrijving)}</p>`);
   const herkomst = [b.maker, b.licentie].filter(Boolean).map(esc).join(' · ');
   if (herkomst) delen.push(`<div class="zacht">${herkomst}</div>`);
@@ -651,6 +809,7 @@ function toonLijst() {
         <span class="zacht">${Number.isFinite(b.jaar) ? esc(jaarTekst(b.jaar)) : '?'} · ${esc(b.plaats || '')}${(b.labels || []).length ? ' · ' + esc(b.labels.join(', ')) : ''}</span>
         ${!Number.isFinite(b.jaar) ? '<div class="waarschuwing">Jaartal ontbreekt</div>' : ''}
         ${!heeftPlaats(b) ? '<div class="waarschuwing">Geen locatie (alleen bruikbaar zonder plaats raden)</div>' : ''}
+        <div>${contextenVan(b).map(c => `<span class="hc-chip">${esc(c.hc.naam)}</span>`).join('')}</div>
         ${b.controleren ? '<div class="waarschuwing">Automatisch ingelezen: controleer jaar en plaats</div>' : ''}
       </div>
       <button class="klein vast" data-actie="bewerk">${b.controleren ? 'Controleer' : 'Bewerk'}</button>
@@ -714,6 +873,7 @@ function maakKiesKaart() {
 function zetLocatie(lat, lng, centreer = true) {
   $('#f-lat').value = lat == null ? '' : (+lat).toFixed(5);
   $('#f-lng').value = lng == null ? '' : (+lng).toFixed(5);
+  toonFormulierHC();
   if (lat == null || lng == null) { if (kiesMarker) { kiesMarker.remove(); kiesMarker = null; } return; }
   if (kiesMarker) kiesMarker.setLatLng([lat, lng]); else kiesMarker = L.marker([lat, lng]).addTo(kiesKaart);
   if (centreer) kiesKaart.setView([lat, lng], Math.max(kiesKaart.getZoom(), 8));
@@ -759,6 +919,19 @@ $('#knop-zoek-plaats').addEventListener('click', async () => {
     zetLocatie(+d[0].lat, +d[0].lon); $('#f-melding').textContent = '';
   } catch (e) { $('#f-melding').textContent = 'Zoeken lukte niet. Klik zelf op de kaart.'; }
 });
+
+// Laat live zien bij welke historische context(en) de bron in het formulier past
+function toonFormulierHC() {
+  const b = {
+    titel: $('#f-titel').value, beschrijving: $('#f-beschrijving').value, plaats: $('#f-plaats').value,
+    jaar: parseInt($('#f-jaar').value, 10), lat: getal($('#f-lat').value), lng: getal($('#f-lng').value),
+    labels: $('#f-labels').value.split(',').map(s => s.trim()).filter(Boolean),
+  };
+  const hcs = contextenVan(b);
+  $('#f-hc').innerHTML = 'Past bij: ' + (hcs.length ? hcs.map(c => `<span class="hc-chip">${esc(c.hc.naam)}${c.nr ? ' · dv ' + c.nr : ''}</span>`).join('')
+    : '<i>geen historische context</i>') + ' <span title="Typ in Labels bijv. HC China (toevoegen) of -HC China (uitsluiten)">ⓘ</span>';
+}
+['#f-titel', '#f-beschrijving', '#f-plaats', '#f-jaar', '#f-lat', '#f-lng', '#f-labels'].forEach(s => $(s).addEventListener('input', toonFormulierHC));
 
 function vulFormulier(b) {
   uploadData = b.afbeelding?.startsWith('data:') ? b.afbeelding : null;
