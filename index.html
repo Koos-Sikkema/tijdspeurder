@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tijdspeurder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  /* ====== KLEUREN EN OPMAAK — pas gerust aan ====== */
+  :root {
+    --papier: #f6f1e7;
+    --kaart: #fffdf8;
+    --inkt: #2b2a27;
+    --zacht: #6b665c;
+    --lijn: #ddd5c4;
+    --accent: #b5532d;
+    --accent-donker: #8f3e20;
+    --goed: #3d7a4a;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif; background: var(--papier); color: var(--inkt); }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--inkt); color: var(--papier); flex-wrap: wrap; }
+  header h1 { font-family: Georgia, serif; font-size: 22px; margin: 0; margin-right: auto; letter-spacing: .5px; }
+  header nav button { background: transparent; color: var(--papier); border: 1px solid transparent; }
+  header nav button.actief { border-color: var(--papier); }
+  main { max-width: 1300px; margin: 0 auto; padding: 20px 16px 60px; }
+  h2 { font-family: Georgia, serif; margin-top: 0; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--lijn); background: var(--kaart); color: var(--inkt); cursor: pointer; }
+  button:hover { border-color: var(--zacht); }
+  button.hoofd { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  button.hoofd:hover { background: var(--accent-donker); }
+  button.klein { padding: 4px 10px; font-size: 13px; }
+  button.gevaar { color: #a33; }
+  input, select, textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--lijn); border-radius: 8px; background: #fff; color: var(--inkt); width: 100%; }
+  textarea { min-height: 80px; resize: vertical; }
+  label { display: block; font-size: 13px; color: var(--zacht); margin: 10px 0 4px; }
+  .blok { background: var(--kaart); border: 1px solid var(--lijn); border-radius: var(--radius); padding: 18px; }
+  .rij { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .rij > * { flex: 1; }
+  .rij > .vast { flex: 0 0 auto; }
+  .zacht { color: var(--zacht); font-size: 14px; }
+  .melding { color: var(--accent-donker); font-size: 14px; min-height: 1.2em; }
+  [hidden] { display: none !important; }
+
+  /* Start */
+  #view-start .blok { max-width: 620px; margin: 0 auto; }
+
+  /* Spel */
+  .spel-raster { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .spel-raster { grid-template-columns: 1fr; } }
+  .spel-kop { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .afb-kader { background: #1d1c1a; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; min-height: 300px; max-height: 72vh; overflow: hidden; cursor: zoom-in; }
+  .afb-kader img { max-width: 100%; max-height: 72vh; object-fit: contain; display: block; }
+  .jaar-groot { font-family: Georgia, serif; font-size: 40px; text-align: center; margin: 4px 0; }
+  input[type=range] { padding: 0; accent-color: var(--accent); }
+  #spel-kaart, #kies-kaart { height: 320px; border-radius: var(--radius); border: 1px solid var(--lijn); }
+  .uitslag-regel { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--lijn); }
+  .punten { font-weight: 700; color: var(--goed); }
+  .bron-info { font-size: 14px; margin-top: 12px; line-height: 1.5; }
+  .bron-info a { color: var(--accent-donker); }
+  #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; z-index: 2000; cursor: zoom-out; }
+  #zoom img { max-width: 96vw; max-height: 96vh; }
+
+  /* Eindscore */
+  .eind-tabel { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .eind-tabel td { padding: 8px; border-bottom: 1px solid var(--lijn); vertical-align: middle; }
+  .eind-tabel img { width: 70px; height: 50px; object-fit: cover; border-radius: 6px; }
+
+  /* Beheer */
+  .beheer-raster { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .beheer-raster { grid-template-columns: 1fr; } }
+  .lijst { max-height: 70vh; overflow: auto; margin-top: 10px; }
+  .lijst-item { display: flex; gap: 10px; align-items: center; padding: 8px; border-bottom: 1px solid var(--lijn); }
+  .lijst-item img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; background: #ddd; flex: 0 0 auto; }
+  .lijst-item .tekst { flex: 1; min-width: 0; }
+  .lijst-item .tekst b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .waarschuwing { color: #a33; font-size: 12px; }
+  #f-voorbeeld { max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 8px; display: block; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tabs button.actief { background: var(--inkt); color: var(--papier); border-color: var(--inkt); }
+  .resultaten { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; max-height: 60vh; overflow: auto; }
+  .resultaat { border: 1px solid var(--lijn); border-radius: 8px; overflow: hidden; background: #fff; font-size: 12px; display: flex; flex-direction: column; }
+  .resultaat img { width: 100%; height: 110px; object-fit: cover; background: #eee; }
+  .resultaat .r-tekst { padding: 6px 8px; flex: 1; }
+  .resultaat button { border-radius: 0; border: 0; border-top: 1px solid var(--lijn); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tijdspeurder</h1>
+  <nav>
+    <button data-naar="start" class="actief">Spelen</button>
+    <button data-naar="beheer">Bronnen beheren</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ================= START ================= -->
+  <section id="view-start" class="view">
+    <div class="blok">
+      <h2>Wanneer en waar was dit?</h2>
+      <p>Je krijgt een historische bron te zien. Raad het jaartal en klik op de kaart waar het was. Hoe dichterbij, hoe meer punten.</p>
+      <label for="kies-tijdvak">Tijdvak</label>
+      <select id="kies-tijdvak"></select>
+      <label for="kies-label">Thema / label</label>
+      <select id="kies-label"></select>
+      <div class="rij">
+        <div>
+          <label for="kies-rondes">Aantal rondes</label>
+          <input id="kies-rondes" type="number" min="1" max="50" value="5">
+        </div>
+        <div>
+          <label><input id="kies-plaats" type="checkbox" checked style="width:auto"> Ook de plaats raden</label>
+          <label><input id="kies-gecontroleerd" type="checkbox" style="width:auto"> Alleen gecontroleerde bronnen</label>
+        </div>
+      </div>
+      <p class="zacht" id="start-telling"></p>
+      <button class="hoofd" id="knop-start">Start spel</button>
+    </div>
+  </section>
+
+  <!-- ================= SPEL ================= -->
+  <section id="view-spel" class="view" hidden>
+    <div class="spel-kop">
+      <h2 id="ronde-teller">Ronde 1</h2>
+      <div>Totaal: <b id="totaal">0</b> punten</div>
+    </div>
+    <div class="spel-raster">
+      <div class="afb-kader" id="afb-kader"><img id="spel-img" alt="Historische bron"></div>
+      <div class="blok">
+        <div id="gok-paneel">
+          <label for="jaar-schuif">Welk jaar?</label>
+          <div class="jaar-groot" id="jaar-tekst">1900</div>
+          <input type="range" id="jaar-schuif">
+          <div class="rij" style="margin-top:8px">
+            <button class="vast klein" data-stap="-10">−10</button>
+            <button class="vast klein" data-stap="-1">−1</button>
+            <input id="jaar-invoer" type="number" title="Typ een jaartal (negatief = v.Chr.)">
+            <button class="vast klein" data-stap="1">+1</button>
+            <button class="vast klein" data-stap="10">+10</button>
+          </div>
+          <div id="kaart-blok">
+            <label>Waar? Klik op de kaart.</label>
+            <div id="spel-kaart"></div>
+          </div>
+          <p class="melding" id="gok-melding"></p>
+          <button class="hoofd" id="knop-raad" style="width:100%">Raad!</button>
+        </div>
+        <div id="uitslag-paneel" hidden>
+          <h3 id="u-titel" style="font-family:Georgia,serif;margin-top:0"></h3>
+          <div class="uitslag-regel"><span id="u-jaar"></span><span class="punten" id="u-jaar-punten"></span></div>
+          <div class="uitslag-regel" id="u-plaats-regel"><span id="u-plaats"></span><span class="punten" id="u-plaats-punten"></span></div>
+          <div id="u-kaart-plek"></div>
+          <div class="bron-info" id="u-bron"></div>
+          <button class="hoofd" id="knop-volgende" style="width:100%;margin-top:14px">Volgende</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= EINDE ================= -->
+  <section id="view-einde" class="view" hidden>
+    <div class="blok" style="max-width:760px;margin:0 auto">
+      <h2>Eindscore: <span id="eind-score"></span></h2>
+      <table class="eind-tabel" id="eind-tabel"></table>
+      <div class="rij" style="margin-top:16px">
+        <button class="hoofd vast" id="knop-opnieuw">Nog een keer</button>
+        <button class="vast" data-naar="start">Andere instellingen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BEHEER ================= -->
+  <section id="view-beheer" class="view" hidden>
+    <div class="beheer-raster">
+      <div class="blok">
+        <h2>Collectie (<span id="aantal">0</span>)</h2>
+        <div class="rij">
+          <input id="lijst-filter" placeholder="Zoek in collectie…">
+          <button class="vast hoofd" id="knop-nieuw">+ Nieuwe bron</button>
+        </div>
+        <label><input type="checkbox" id="lijst-controleren" style="width:auto"> Alleen bronnen die ik nog moet controleren (<span id="aantal-controleren">0</span>)</label>
+        <div class="lijst" id="lijst"></div>
+        <div class="rij" style="margin-top:12px">
+          <button class="vast klein" id="knop-export">Exporteren (.json)</button>
+          <button class="vast klein" id="knop-import">Importeren</button>
+          <input type="file" id="import-bestand" accept=".json,application/json" hidden>
+          <button class="vast klein" id="knop-voorbeelden">Voorbeelden toevoegen</button>
+          <button class="vast klein gevaar" id="knop-wis">Alles wissen</button>
+        </div>
+        <p class="zacht">De collectie wordt in deze browser bewaard. Exporteer hem om hem te delen met collega's of leerlingen (zij kunnen hem importeren).</p>
+      </div>
+
+      <div>
+        <div class="blok" style="margin-bottom:18px">
+          <div class="tabs">
+            <button class="actief" data-tab="formulier">Bron bewerken</button>
+            <button data-tab="zoeken">Zoeken in archieven</button>
+            <button data-tab="kleio">VGN Kleio importeren</button>
+          </div>
+
+          <!-- Kleio in één keer -->
+          <div id="tab-kleio" hidden>
+            <p style="margin-top:0">Haal alle beeldbronnen uit de <a href="https://www.vgnkleio.nl/bronnen/" target="_blank" rel="noopener">bronnenbank van VGN Kleio</a> in één keer binnen.</p>
+            <p class="zacht">Kleio geeft per bron een tijdvak en een regio, maar geen exact jaartal of exacte plek. Tijdspeurder zoekt het jaartal in de titel en de beschrijving en zet de bron op het midden van de regio. Daarom krijgen alle geïmporteerde bronnen de markering <b>controleren</b>. Na het controleren en opslaan verdwijnt die. Opnieuw importeren werkt alleen nieuwe en nog niet gecontroleerde bronnen bij. Jouw eigen correcties blijven staan.</p>
+            <label>Welke soorten bronnen?</label>
+            <div id="k-types"></div>
+            <label><input type="checkbox" id="k-zonder-jaar" style="width:auto"> Ook bronnen importeren waarin geen jaartal is gevonden (vul je later zelf in)</label>
+            <p class="melding" id="k-melding"></p>
+            <button class="hoofd" id="knop-kleio">Importeer uit VGN Kleio</button>
+          </div>
+
+          <!-- Formulier -->
+          <div id="tab-formulier">
+            <input type="hidden" id="f-id">
+            <input type="hidden" id="f-reserve">
+            <label for="f-titel">Titel (pas zichtbaar na het raden)</label>
+            <input id="f-titel">
+            <label for="f-afb">Afbeelding: link (URL)…</label>
+            <div class="rij">
+              <input id="f-afb" placeholder="https://…">
+              <button class="vast" id="knop-upload">…of uploaden</button>
+              <input type="file" id="f-upload" accept="image/*" hidden>
+            </div>
+            <img id="f-voorbeeld" hidden alt="">
+            <div class="rij">
+              <div>
+                <label for="f-jaar">Jaar (negatief = v.Chr.)</label>
+                <input id="f-jaar" type="number">
+              </div>
+              <div>
+                <label for="f-labels">Labels (komma's ertussen)</label>
+                <input id="f-labels" placeholder="bijv. WOII, klas 3">
+              </div>
+            </div>
+            <label for="f-plaats">Plaats — zoek of klik op de kaart</label>
+            <div class="rij">
+              <input id="f-plaats" placeholder="bijv. Rotterdam">
+              <button class="vast" id="knop-zoek-plaats">Zoek op kaart</button>
+            </div>
+            <div id="kies-kaart" style="margin-top:8px"></div>
+            <div class="rij">
+              <div><label for="f-lat">Breedtegraad</label><input id="f-lat" type="number" step="any"></div>
+              <div><label for="f-lng">Lengtegraad</label><input id="f-lng" type="number" step="any"></div>
+            </div>
+            <label for="f-beschrijving">Uitleg (pas zichtbaar na het raden)</label>
+            <textarea id="f-beschrijving"></textarea>
+            <div class="rij">
+              <div><label for="f-maker">Maker / collectie</label><input id="f-maker"></div>
+              <div><label for="f-licentie">Licentie</label><input id="f-licentie" placeholder="bijv. Publiek domein"></div>
+            </div>
+            <label for="f-bron-url">Link naar de bron</label>
+            <input id="f-bron-url" placeholder="https://…">
+            <p class="melding" id="f-melding"></p>
+            <div class="rij">
+              <button class="hoofd vast" id="knop-opslaan">Opslaan</button>
+              <button class="vast" id="knop-leeg">Leegmaken</button>
+            </div>
+          </div>
+
+          <!-- Zoeken -->
+          <div id="tab-zoeken" hidden>
+            <p class="zacht" style="margin-top:0">Zoek beeldmateriaal in geselecteerde archieven. Klik op <i>Overnemen</i> en controleer daarna jaar en plaats in het formulier.</p>
+            <label for="z-bron">Archief</label>
+            <select id="z-bron"></select>
+            <div class="rij" style="margin-top:8px">
+              <input id="z-term" placeholder="bijv. watersnood 1953, bevrijding, stoomtrein">
+              <button class="vast hoofd" id="knop-zoek">Zoek</button>
+            </div>
+            <p class="melding" id="z-melding"></p>
+            <div class="resultaten" id="z-resultaten"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="zoom" hidden><img alt=""></div>
+
+<script>
+/* =====================================================================
+   INSTELLINGEN — hier kun je het spel naar je hand zetten
+   ===================================================================== */
+const CONFIG = {
+  maxJaarPunten: 5000,       // max. punten voor het jaartal
+  maxPlaatsPunten: 5000,     // max. punten voor de plaats
+  jaarStrengheid: 20,        // hoe kleiner, hoe strenger (bij 20 jaar ernaast houd je ~37% over)
+  afstandStrengheid: 300,    // in km; bij 300 km ernaast houd je ~37% over
+  kaartStart: [50, 10], kaartZoom: 3,   // beginpositie van de raadkaart
+  europeanaKey: 'api2demo',  // gratis eigen sleutel aanvragen: https://pro.europeana.eu/page/get-api
+
+  // De archieven waarin je vanuit "Bronnen beheren" kunt zoeken.
+  // type 'commons' = Wikimedia Commons, type 'europeana' = Europeana (eventueel gefilterd op één instelling).
+  // Let op: Europeana gebruikt de Engelse naam van de instelling als 'aanbieder'.
+  zoekBronnen: [
+    { naam: 'VGN Kleio — bronnenbank', type: 'kleio' },
+    { naam: 'Wikimedia Commons', type: 'commons' },
+    { naam: 'Europeana — alle collecties', type: 'europeana' },
+    { naam: 'Nationaal Archief (via Europeana)', type: 'europeana', aanbieder: 'National Archives of the Netherlands' },
+    { naam: 'Rijksmuseum (via Europeana)', type: 'europeana', aanbieder: 'Rijksmuseum' },
+    { naam: 'IISG (via Europeana)', type: 'europeana', aanbieder: 'International Institute of Social History' },
+    { naam: 'Het Utrechts Archief (via Europeana)', type: 'europeana', aanbieder: 'The Utrecht Archives' },
+    { naam: 'Zuiderzeemuseum (via Europeana)', type: 'europeana', aanbieder: 'Zuiderzee Museum' },
+  ],
+
+  // VGN Kleio (vgnkleio.nl/bronnen): adres van de bronnenbank
+  kleioApi: 'https://www.vgnkleio.nl/wp-json/wp/v2',
+};
+
+/* ---------------------------------------------------------------------
+   VGN KLEIO: hoe tijd- en ruimte-categorieën worden omgezet
+   --------------------------------------------------------------------- */
+// Bij welk tijdvak hoort welk jaarbereik (gebruikt om een jaartal uit de tekst te kiezen)
+const KLEIO_TIJD = {
+  'Prehistorie': [-10000, -3000], 'Oudheid': [-3000, 500], 'Vroege middeleeuwen': [500, 1000],
+  'Late middeleeuwen': [1000, 1500], '16e eeuw': [1500, 1599], '17e eeuw': [1600, 1699],
+  '18e eeuw': [1700, 1799], '19e eeuw': [1800, 1899], '20e eeuw': [1900, 1999], '21e eeuw': [2000, 2030],
+};
+// Middelpunt per regio uit Kleio (de plaats is dus bij benadering!)
+const KLEIO_PLEK = {
+  'Afrika': [2, 20], 'Australië': [-25, 134], 'Azië': [34, 100], 'Bangladesh': [23.7, 90.4], 'België': [50.6, 4.6],
+  'Bosnië en Herzegovina': [44, 17.8], 'Brazilië': [-10, -52], 'Caraïbisch Gebied': [18, -72], 'China': [35, 104],
+  'Cuba': [21.5, -79], 'Denemarken': [56, 10], 'Drenthe': [52.9, 6.6], 'Duitsland': [51, 10.4], 'Egypte': [26.8, 30.8],
+  'Europa': [50, 10], 'Flevoland': [52.5, 5.6], 'Frankrijk': [46.6, 2.4], 'Friesland': [53.1, 5.8], 'Gelderland': [52.05, 5.9],
+  'Griekenland': [39, 22], 'Groningen': [53.25, 6.7], 'Groot-Brittannië': [53, -1.5], 'Hongarije': [47.2, 19.4],
+  'Ierland': [53.2, -8], 'India': [22, 79], 'Indonesië': [-2.5, 118], 'Irak': [33, 44], 'Iran': [32.4, 53.7],
+  'Israël': [31.4, 35], 'Italië': [42.8, 12.5], 'Japan': [36.2, 138], 'Korea': [37.5, 127.5], 'Limburg': [51.2, 5.9],
+  'Marokko': [31.8, -7], 'Midden-Amerika': [14, -87], 'Midden-Oosten': [29, 42], 'Nederland': [52.2, 5.3],
+  'Noord-Amerika': [45, -100], 'Noord-Brabant': [51.55, 5.2], 'Noord-Holland': [52.6, 4.85], 'Noorwegen': [61, 9],
+  'Oceanië': [-20, 150], 'Oostenrijk': [47.6, 14.1], 'Overijssel': [52.45, 6.45], 'Polen': [52, 19.1], 'Portugal': [39.6, -8],
+  'Rusland': [56, 38], 'Scandinavië': [62, 15], 'Spanje': [40.3, -3.7], 'Suriname': [4, -56], 'Turkije': [39, 35],
+  'Utrecht': [52.08, 5.17], 'Verenigde Staten': [39.8, -98.6], 'Vietnam': [16, 107], 'Zeeland': [51.5, 3.85],
+  'Zuid-Amerika': [-15, -60], 'Zuid-Afrika': [-29, 24], 'Zuid-Arfika': [-29, 24], 'Zuid-Holland': [52, 4.5],
+  'Zweden': [62, 16], 'Zwitserland': [46.8, 8.2],
+};
+// Welke brontypes van Kleio beeld bevatten (id's uit de Kleio-database)
+const KLEIO_BEELDTYPES = [
+  { id: 190, naam: 'Foto' }, { id: 191, naam: 'Tekening of schilderij' }, { id: 189, naam: 'Spotprent, cartoon of poster' },
+  { id: 196, naam: 'Object' }, { id: 193, naam: 'Kaart' }, { id: 407, naam: 'Infographic' }, { id: 188, naam: 'Afbeelding (overig)' },
+];
+
+const TIJDVAKKEN = [
+  { naam: 'Alle tijdvakken', van: null, tot: null },
+  { naam: '1. Jagers en boeren (tot 3000 v.Chr.)', van: -10000, tot: -3000 },
+  { naam: '2. Grieken en Romeinen (3000 v.Chr. – 500)', van: -3000, tot: 500 },
+  { naam: '3. Monniken en ridders (500 – 1000)', van: 500, tot: 1000 },
+  { naam: '4. Steden en staten (1000 – 1500)', van: 1000, tot: 1500 },
+  { naam: '5. Ontdekkers en hervormers (1500 – 1600)', van: 1500, tot: 1600 },
+  { naam: '6. Regenten en vorsten (1600 – 1700)', van: 1600, tot: 1700 },
+  { naam: '7. Pruiken en revoluties (1700 – 1800)', van: 1700, tot: 1800 },
+  { naam: '8. Burgers en stoommachines (1800 – 1900)', van: 1800, tot: 1900 },
+  { naam: '9. Wereldoorlogen (1900 – 1950)', van: 1900, tot: 1950 },
+  { naam: '10. Televisie en computer (1950 – 2000)', van: 1950, tot: 2000 },
+  { naam: 'Na 2000', van: 2000, tot: new Date().getFullYear() + 1 },
+];
+
+// Startcollectie (wordt geladen als de collectie leeg is, of via "Voorbeelden toevoegen")
+const VOORBEELDEN = [
+  { titel: 'De eerste gemotoriseerde vlucht van de gebroeders Wright', jaar: 1903, plaats: 'Kitty Hawk, North Carolina (VS)', lat: 36.0195, lng: -75.6683,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/First_flight2.jpg/1280px-First_flight2.jpg',
+    beschrijving: 'Op 17 december 1903 vloog Orville Wright twaalf seconden met de Wright Flyer. Het begin van de luchtvaart.',
+    maker: 'John T. Daniels / Wikimedia Commons', licentie: 'Publiek domein', bronUrl: 'https://commons.wikimedia.org/wiki/File:First_flight2.jpg', labels: ['techniek', 'wereld'] },
+  { titel: 'Sluiting van de Zuiderzee', jaar: 1932, plaats: 'De Vlieter, Afsluitdijk', lat: 53.035, lng: 5.13,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sluiting_van_de_Zuiderzee.jpg/1280px-Sluiting_van_de_Zuiderzee.jpg',
+    beschrijving: 'Op 28 mei 1932 werd het laatste gat in de Afsluitdijk gedicht. De Zuiderzee werd het IJsselmeer.',
+    maker: 'Wikimedia Commons', licentie: 'Publiek domein', bronUrl: 'https://commons.wikimedia.org/wiki/File:Sluiting_van_de_Zuiderzee.jpg', labels: ['Nederland', 'water'] },
+  { titel: 'Rotterdam na het bombardement', jaar: 1940, plaats: 'Rotterdam', lat: 51.9225, lng: 4.4792,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Bombardement_Rotterdam%2C_Bestanddeelnr_120-0455.jpg/1280px-Bombardement_Rotterdam%2C_Bestanddeelnr_120-0455.jpg',
+    beschrijving: 'Op 14 mei 1940 bombardeerde de Duitse luchtmacht de binnenstad van Rotterdam. Een dag later capituleerde Nederland.',
+    maker: 'Nationaal Archief / Wikimedia Commons', licentie: 'CC0', bronUrl: 'https://commons.wikimedia.org/wiki/File:Bombardement_Rotterdam,_Bestanddeelnr_120-0455.jpg', labels: ['WOII', 'Nederland'] },
+  { titel: 'Intocht van de Canadezen in Amsterdam', jaar: 1945, plaats: 'Amstellaan (nu Vrijheidslaan), Amsterdam', lat: 52.3466, lng: 4.905,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Intocht_van_de_Canadezen_aan_de_Amstellaan_%28nu_Vrijheidslaan_genoemd%29%2C_Bestanddeelnr_900-2944.jpg/1280px-Intocht_van_de_Canadezen_aan_de_Amstellaan_%28nu_Vrijheidslaan_genoemd%29%2C_Bestanddeelnr_900-2944.jpg',
+    beschrijving: 'In mei 1945 trokken Canadese troepen Amsterdam binnen. De Amstellaan kreeg daarna de naam Vrijheidslaan.',
+    maker: 'Nationaal Archief / Wikimedia Commons', licentie: 'CC0', bronUrl: 'https://commons.wikimedia.org/wiki/File:Intocht_van_de_Canadezen_aan_de_Amstellaan_(nu_Vrijheidslaan_genoemd),_Bestanddeelnr_900-2944.jpg', labels: ['WOII', 'Nederland'] },
+  { titel: 'Watersnoodramp in Oudenhoorn', jaar: 1953, plaats: 'Oudenhoorn (Voorne-Putten)', lat: 51.8297, lng: 4.1914,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/NIMH_P101-C41_017_Watersnoodramp_1953_Oudenhoorn.jpg/1280px-NIMH_P101-C41_017_Watersnoodramp_1953_Oudenhoorn.jpg',
+    beschrijving: 'In de nacht van 31 januari op 1 februari 1953 braken in Zuidwest-Nederland de dijken door. Ruim 1800 mensen kwamen om. Daarna volgden de Deltawerken.',
+    maker: 'NIMH / Wikimedia Commons', licentie: 'Publiek domein', bronUrl: 'https://commons.wikimedia.org/wiki/File:NIMH_P101-C41_017_Watersnoodramp_1953_Oudenhoorn.jpg', labels: ['Nederland', 'water'] },
+  { titel: 'Elfstedentocht van 1963', jaar: 1963, plaats: 'Friesland', lat: 53.2014, lng: 5.7999,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Elfstedentocht1963Paping.jpg/1280px-Elfstedentocht1963Paping.jpg',
+    beschrijving: 'De Elfstedentocht van 1963 staat bekend als de "hel van \'63": door de strenge kou haalden maar 69 van de bijna 10.000 deelnemers de finish. Winnaar was Reinier Paping.',
+    maker: 'Wikimedia Commons', licentie: 'CC0', bronUrl: 'https://commons.wikimedia.org/wiki/File:Elfstedentocht1963Paping.jpg', labels: ['Nederland'] },
+  { titel: 'Oost- en West-Duitsers bij de Brandenburger Tor', jaar: 1989, plaats: 'Berlijn', lat: 52.5163, lng: 13.3777,
+    afbeelding: 'https://upload.wikimedia.org/wikipedia/commons/1/1c/West_and_East_Germans_at_the_Brandenburg_Gate_in_1989.jpg',
+    beschrijving: 'Op 9 november 1989 ging de Berlijnse Muur open. Kort daarna vierden duizenden mensen feest op en bij de Muur bij de Brandenburger Tor.',
+    maker: 'Wikimedia Commons', licentie: 'CC BY-SA 3.0', bronUrl: 'https://commons.wikimedia.org/wiki/File:West_and_East_Germans_at_the_Brandenburg_Gate_in_1989.jpg', labels: ['Koude Oorlog', 'wereld'] },
+];
+
+/* =====================================================================
+   HULPFUNCTIES
+   ===================================================================== */
+const OPSLAG = 'tijdspeurder.bronnen.v1';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const jaarTekst = j => j < 0 ? `${-j} v.Chr.` : String(j);
+const heeftPlaats = b => Number.isFinite(b.lat) && Number.isFinite(b.lng);
+const getal = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const htmlNaarTekst = h => h ? new DOMParser().parseFromString(String(h), 'text/html').body.textContent.replace(/\s+/g, ' ').trim() : '';
+function vindJaar(t) { const m = String(t || '').match(/\b(1\d{3}|20\d{2})\b/); return m ? +m[1] : null; }
+function schud(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function afstandKm(a, b) {
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function zetAfbeelding(img, b) {
+  img.onerror = b.reserve ? () => { img.onerror = null; img.src = b.reserve; } : null;
+  img.src = b.afbeelding;
+}
+function tegels() {
+  // Kaartlaag van Esri: werkt ook als je het bestand lokaal opent (zonder webserver)
+  return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Kaart &copy; Esri', maxZoom: 18,
+  });
+}
+
+/* =====================================================================
+   OPSLAG
+   ===================================================================== */
+let bronnen = [];
+function laad() {
+  try { const r = localStorage.getItem(OPSLAG); if (r) return JSON.parse(r); } catch (e) {}
+  return null;
+}
+let opslagGewaarschuwd = false;
+function bewaar() {
+  try {
+    // online met collectie.json: alleen eigen wijzigingen en toevoegingen bewaren
+    if (vasteCollectie) localStorage.setItem(OPSLAG + '.eigen', JSON.stringify(bronnen.filter(b => vasteCollectie.get(b.id) !== JSON.stringify(b))));
+    else localStorage.setItem(OPSLAG, JSON.stringify(bronnen));
+    return true;
+  }
+  catch (e) {
+    if (e.name === 'QuotaExceededError') { alert('Opslaan lukt niet: de browseropslag is vol. Gebruik liever links naar afbeeldingen dan uploads, of exporteer en verwijder bronnen.'); return false; }
+    if (!opslagGewaarschuwd) { opslagGewaarschuwd = true; alert('Deze browser staat opslaan niet toe. Je wijzigingen verdwijnen bij het sluiten: gebruik "Exporteren" om ze te bewaren.'); }
+    return true;   // in het geheugen houden
+  }
+}
+bronnen = laad();
+if (!bronnen) { bronnen = VOORBEELDEN.map(b => ({ ...b, id: uid() })); bewaar(); }
+
+/* Online versie: staat er een bestand collectie.json naast index.html, dan krijgt iedereen
+   (dus ook leerlingen) automatisch die collectie. Wijzigingen die iemand zelf maakt, blijven
+   in zijn eigen browser bewaard. Het beheerscherm is dan verborgen; open het met #beheer achter de link. */
+let vasteCollectie = false;
+async function laadVasteCollectie() {
+  try {
+    const r = await fetch('collectie.json', { cache: 'no-cache' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const vast = Array.isArray(data) ? data : data.bronnen;
+    if (!Array.isArray(vast) || !vast.length) return;
+    vast.forEach((b, i) => { b.id = b.id || 'c' + i; });
+    vasteCollectie = new Map(vast.map(b => [b.id, JSON.stringify(b)]));
+    let eigen = null;
+    try { eigen = JSON.parse(localStorage.getItem(OPSLAG + '.eigen') || 'null'); } catch (e) {}
+    // eigen aanpassingen (zelfde id) gaan voor; eigen toevoegingen komen erbij
+    const opId = new Map(vast.map(b => [b.id, b]));
+    (eigen || []).forEach(b => opId.set(b.id, b));
+    bronnen = [...opId.values()];
+    if (location.hash !== '#beheer') $$('header nav button[data-naar="beheer"]').forEach(b => b.hidden = true);
+    vulStart();
+  } catch (e) { /* geen collectie.json (of lokaal geopend): gewoon de eigen collectie gebruiken */ }
+}
+
+/* =====================================================================
+   NAVIGATIE
+   ===================================================================== */
+let spelKaart, kiesKaart;
+function toon(naam) {
+  $$('.view').forEach(v => v.hidden = v.id !== 'view-' + naam);
+  $$('header nav button').forEach(b => b.classList.toggle('actief',
+    b.dataset.naar === naam || (b.dataset.naar === 'start' && ['spel', 'einde'].includes(naam))));
+  if (naam === 'start') vulStart();
+  if (naam === 'spel') { maakSpelKaart(); setTimeout(() => spelKaart.invalidateSize(), 0); }
+  if (naam === 'beheer') { maakKiesKaart(); setTimeout(() => kiesKaart.invalidateSize(), 0); toonLijst(); }
+  window.scrollTo(0, 0);
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-naar]'); if (b) toon(b.dataset.naar); });
+
+/* =====================================================================
+   START
+   ===================================================================== */
+TIJDVAKKEN.forEach((t, i) => $('#kies-tijdvak').add(new Option(t.naam, i)));
+function vulStart() {
+  const sel = $('#kies-label'), huidig = sel.value;
+  const labels = [...new Set(bronnen.flatMap(b => b.labels || []))].sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '';
+  sel.add(new Option('Alle thema\'s', ''));
+  labels.forEach(l => sel.add(new Option(l, l)));
+  if (labels.includes(huidig)) sel.value = huidig;
+  const n = speelbaar().length;
+  $('#start-telling').textContent = `${n} bron${n === 1 ? '' : 'nen'} beschikbaar met deze instellingen.`;
+}
+function speelbaar() {
+  const tv = TIJDVAKKEN[+$('#kies-tijdvak').value || 0];
+  const label = $('#kies-label').value;
+  const metPlaats = $('#kies-plaats').checked;
+  const alleenGecontroleerd = $('#kies-gecontroleerd').checked;
+  return bronnen.filter(b => b.afbeelding && Number.isFinite(b.jaar)
+    && (!alleenGecontroleerd || !b.controleren)
+    && (tv.van == null || (b.jaar >= tv.van && b.jaar < tv.tot))
+    && (!label || (b.labels || []).includes(label))
+    && (!metPlaats || heeftPlaats(b)));
+}
+['#kies-tijdvak', '#kies-label', '#kies-plaats', '#kies-gecontroleerd'].forEach(s => $(s).addEventListener('change', vulStart));
+
+/* =====================================================================
+   SPEL
+   ===================================================================== */
+let spel = null, bereik = { min: 1800, max: 2025 }, gokMarker = null, spelLagen = null;
+
+function maakSpelKaart() {
+  if (spelKaart) return;
+  spelKaart = L.map('spel-kaart', { worldCopyJump: true }).setView(CONFIG.kaartStart, CONFIG.kaartZoom);
+  tegels().addTo(spelKaart);
+  spelLagen = L.layerGroup().addTo(spelKaart);
+  spelKaart.on('click', e => {
+    if (!$('#uitslag-paneel').hidden) return;
+    if (gokMarker) gokMarker.setLatLng(e.latlng);
+    else gokMarker = L.marker(e.latlng).addTo(spelLagen);
+    $('#gok-melding').textContent = '';
+  });
+}
+
+$('#knop-start').addEventListener('click', startSpel);
+$('#knop-opnieuw').addEventListener('click', startSpel);
+function startSpel() {
+  const pool = schud(speelbaar());
+  if (!pool.length) { alert('Er zijn geen bronnen die passen bij deze instellingen. Voeg bronnen toe via "Bronnen beheren".'); toon('start'); return; }
+  const n = Math.max(1, Math.min(+$('#kies-rondes').value || 5, pool.length));
+  const tv = TIJDVAKKEN[+$('#kies-tijdvak').value || 0];
+  if (tv.van != null) bereik = { min: tv.van, max: tv.tot - 1 };
+  else {
+    const jaren = bronnen.filter(b => Number.isFinite(b.jaar)).map(b => b.jaar);
+    bereik = {
+      min: Math.floor((Math.min(...jaren) - 50) / 100) * 100,
+      max: Math.min(new Date().getFullYear(), Math.ceil((Math.max(...jaren) + 20) / 50) * 50),
+    };
+  }
+  spel = { rondes: pool.slice(0, n).map(b => ({ bron: b })), i: 0, metPlaats: $('#kies-plaats').checked };
+  toon('spel');
+  toonRonde();
+}
+
+function zetJaar(j) {
+  j = Math.round(Math.max(bereik.min, Math.min(bereik.max, j)));
+  $('#jaar-schuif').value = j; $('#jaar-invoer').value = j; $('#jaar-tekst').textContent = jaarTekst(j);
+}
+$('#jaar-schuif').addEventListener('input', e => zetJaar(+e.target.value));
+$('#jaar-invoer').addEventListener('change', e => zetJaar(+e.target.value));
+$$('[data-stap]').forEach(b => b.addEventListener('click', () => zetJaar(+$('#jaar-invoer').value + +b.dataset.stap)));
+
+function toonRonde() {
+  const r = spel.rondes[spel.i];
+  $('#ronde-teller').textContent = `Ronde ${spel.i + 1} van ${spel.rondes.length}`;
+  $('#totaal').textContent = spel.rondes.reduce((s, x) => s + (x.jp || 0) + (x.pp || 0), 0).toLocaleString('nl-NL');
+  zetAfbeelding($('#spel-img'), r.bron);
+  const s = $('#jaar-schuif'); s.min = bereik.min; s.max = bereik.max;
+  zetJaar((bereik.min + bereik.max) / 2);
+  $('#gok-paneel').hidden = false; $('#uitslag-paneel').hidden = true; $('#gok-melding').textContent = '';
+  // kaart terug naar het gokpaneel
+  $('#kaart-blok').appendChild($('#spel-kaart'));
+  $('#kaart-blok').hidden = !spel.metPlaats;
+  spelLagen.clearLayers(); gokMarker = null;
+  spelKaart.setView(CONFIG.kaartStart, CONFIG.kaartZoom);
+  setTimeout(() => spelKaart.invalidateSize(), 0);
+}
+
+$('#knop-raad').addEventListener('click', () => {
+  const r = spel.rondes[spel.i], b = r.bron;
+  if (spel.metPlaats && !gokMarker) { $('#gok-melding').textContent = 'Klik eerst op de kaart waar je denkt dat het was.'; return; }
+  r.jaarGok = +$('#jaar-invoer').value;
+  const verschil = Math.abs(r.jaarGok - b.jaar);
+  r.jp = Math.round(CONFIG.maxJaarPunten * Math.exp(-verschil / CONFIG.jaarStrengheid));
+  $('#u-titel').textContent = b.titel || 'Zonder titel';
+  $('#u-jaar').innerHTML = `<b>${esc(jaarTekst(b.jaar))}</b> — jij: ${esc(jaarTekst(r.jaarGok))} (${verschil === 0 ? 'precies goed!' : verschil + ' jaar ernaast'})`;
+  $('#u-jaar-punten').textContent = '+' + r.jp.toLocaleString('nl-NL');
+
+  $('#u-plaats-regel').hidden = !spel.metPlaats;
+  if (spel.metPlaats) {
+    const gok = gokMarker.getLatLng(), echt = { lat: b.lat, lng: b.lng };
+    r.km = afstandKm(gok, echt);
+    r.pp = Math.round(CONFIG.maxPlaatsPunten * Math.exp(-r.km / CONFIG.afstandStrengheid));
+    $('#u-plaats').innerHTML = `<b>${esc(b.plaats || 'Locatie')}</b> — ${r.km < 1 ? 'minder dan 1 km' : Math.round(r.km).toLocaleString('nl-NL') + ' km'} ernaast`;
+    $('#u-plaats-punten').textContent = '+' + r.pp.toLocaleString('nl-NL');
+    const juist = L.circleMarker(echt, { radius: 9, color: '#3d7a4a', fillColor: '#3d7a4a', fillOpacity: .9 }).addTo(spelLagen).bindTooltip('Hier was het');
+    L.polyline([gok, echt], { color: '#b5532d', dashArray: '6 6' }).addTo(spelLagen);
+    $('#u-kaart-plek').appendChild($('#spel-kaart'));
+    setTimeout(() => { spelKaart.invalidateSize(); spelKaart.fitBounds(L.latLngBounds([gok, echt]).pad(0.3), { maxZoom: 10 }); }, 0);
+  } else r.pp = 0;
+
+  const delen = [];
+  if (b.beschrijving) delen.push(`<p>${esc(b.beschrijving)}</p>`);
+  const herkomst = [b.maker, b.licentie].filter(Boolean).map(esc).join(' · ');
+  if (herkomst) delen.push(`<div class="zacht">${herkomst}</div>`);
+  if (b.bronUrl) delen.push(`<a href="${esc(b.bronUrl)}" target="_blank" rel="noopener">Bekijk de bron ↗</a>`);
+  $('#u-bron').innerHTML = delen.join('');
+  $('#knop-volgende').textContent = spel.i + 1 < spel.rondes.length ? 'Volgende ronde' : 'Bekijk eindscore';
+  $('#gok-paneel').hidden = true; $('#uitslag-paneel').hidden = false;
+  $('#totaal').textContent = spel.rondes.reduce((s, x) => s + (x.jp || 0) + (x.pp || 0), 0).toLocaleString('nl-NL');
+});
+
+$('#knop-volgende').addEventListener('click', () => {
+  spel.i++;
+  if (spel.i < spel.rondes.length) { toonRonde(); window.scrollTo(0, 0); }
+  else toonEinde();
+});
+
+function toonEinde() {
+  const max = spel.rondes.length * (CONFIG.maxJaarPunten + (spel.metPlaats ? CONFIG.maxPlaatsPunten : 0));
+  const tot = spel.rondes.reduce((s, x) => s + x.jp + x.pp, 0);
+  $('#eind-score').textContent = `${tot.toLocaleString('nl-NL')} / ${max.toLocaleString('nl-NL')}`;
+  $('#eind-tabel').innerHTML = spel.rondes.map(r => `
+    <tr>
+      <td><img src="${esc(r.bron.afbeelding)}" alt=""></td>
+      <td><b>${esc(r.bron.titel || 'Zonder titel')}</b><br>
+        <span class="zacht">${esc(jaarTekst(r.bron.jaar))} (jij: ${esc(jaarTekst(r.jaarGok))})${spel.metPlaats ? ` · ${Math.round(r.km)} km ernaast` : ''}</span></td>
+      <td class="punten">${(r.jp + r.pp).toLocaleString('nl-NL')}</td>
+    </tr>`).join('');
+  toon('einde');
+}
+
+// Afbeelding vergroten
+$('#afb-kader').addEventListener('click', () => { const z = $('#zoom'); z.querySelector('img').src = $('#spel-img').src; z.hidden = false; });
+$('#zoom').addEventListener('click', () => $('#zoom').hidden = true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#zoom').hidden = true; });
+
+/* =====================================================================
+   BEHEER: LIJST
+   ===================================================================== */
+function toonLijst() {
+  $('#aantal').textContent = bronnen.length;
+  $('#aantal-controleren').textContent = bronnen.filter(b => b.controleren).length;
+  const f = $('#lijst-filter').value.toLowerCase(), alleenC = $('#lijst-controleren').checked;
+  const lijst = bronnen.filter(b => (!alleenC || b.controleren)
+    && (!f || [b.titel, b.plaats, b.beschrijving, (b.labels || []).join(' '), b.jaar].join(' ').toLowerCase().includes(f)));
+  const MAX = 150;
+  $('#lijst').innerHTML = (lijst.length ? lijst.slice(0, MAX).map(b => `
+    <div class="lijst-item" data-id="${esc(b.id)}">
+      <img src="${esc(b.afbeelding)}" alt="" loading="lazy">
+      <div class="tekst">
+        <b>${esc(b.titel || 'Zonder titel')}</b>
+        <span class="zacht">${Number.isFinite(b.jaar) ? esc(jaarTekst(b.jaar)) : '?'} · ${esc(b.plaats || '')}${(b.labels || []).length ? ' · ' + esc(b.labels.join(', ')) : ''}</span>
+        ${!Number.isFinite(b.jaar) ? '<div class="waarschuwing">Jaartal ontbreekt</div>' : ''}
+        ${!heeftPlaats(b) ? '<div class="waarschuwing">Geen locatie (alleen bruikbaar zonder plaats raden)</div>' : ''}
+        ${b.controleren ? '<div class="waarschuwing">Automatisch ingelezen: controleer jaar en plaats</div>' : ''}
+      </div>
+      <button class="klein vast" data-actie="bewerk">${b.controleren ? 'Controleer' : 'Bewerk'}</button>
+      <button class="klein vast gevaar" data-actie="verwijder" title="Verwijderen">✕</button>
+    </div>`).join('') : '<p class="zacht">Geen bronnen gevonden.</p>')
+    + (lijst.length > MAX ? `<p class="zacht">…en nog ${lijst.length - MAX} bronnen. Gebruik het zoekveld om ze te vinden.</p>` : '');
+}
+$('#lijst-filter').addEventListener('input', toonLijst);
+$('#lijst-controleren').addEventListener('change', toonLijst);
+$('#lijst').addEventListener('click', e => {
+  const knop = e.target.closest('[data-actie]'); if (!knop) return;
+  const id = knop.closest('.lijst-item').dataset.id, b = bronnen.find(x => x.id === id);
+  if (knop.dataset.actie === 'bewerk') {
+    vulFormulier(b); kiesTab('formulier');
+    if (b.controleren) $('#f-melding').textContent = 'Automatisch ingelezen. Lees de uitleg, verbeter jaar en plaats (klik op de kaart) en klik op Opslaan. Dan geldt de bron als gecontroleerd.';
+    $('#f-titel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (knop.dataset.actie === 'verwijder' && confirm(`"${b.titel || 'Deze bron'}" verwijderen?`)) {
+    bronnen = bronnen.filter(x => x.id !== id); bewaar(); toonLijst();
+  }
+});
+
+$('#knop-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ app: 'tijdspeurder', versie: 1, bronnen }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'collectie.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#knop-import').addEventListener('click', () => $('#import-bestand').click());
+$('#import-bestand').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const nieuw = Array.isArray(data) ? data : data.bronnen;
+    if (!Array.isArray(nieuw)) throw new Error('geen bronnenlijst');
+    let n = 0;
+    nieuw.forEach(b => { b.id = b.id || uid(); const i = bronnen.findIndex(x => x.id === b.id); if (i >= 0) bronnen[i] = b; else bronnen.push(b); n++; });
+    bewaar(); toonLijst(); alert(`${n} bronnen geïmporteerd.`);
+  } catch (err) { alert('Dit bestand kon niet worden ingelezen: ' + err.message); }
+  e.target.value = '';
+});
+$('#knop-voorbeelden').addEventListener('click', () => {
+  const bestaande = new Set(bronnen.map(b => b.afbeelding));
+  const extra = VOORBEELDEN.filter(v => !bestaande.has(v.afbeelding)).map(v => ({ ...v, id: uid() }));
+  bronnen.push(...extra); bewaar(); toonLijst(); alert(`${extra.length} voorbeelden toegevoegd.`);
+});
+$('#knop-wis').addEventListener('click', () => {
+  if (confirm('Weet je zeker dat je de hele collectie wilt wissen? Exporteer hem eerst als je hem wilt bewaren.')) { bronnen = []; bewaar(); toonLijst(); leegFormulier(); }
+});
+
+/* =====================================================================
+   BEHEER: FORMULIER
+   ===================================================================== */
+let uploadData = null, kiesMarker = null;
+function maakKiesKaart() {
+  if (kiesKaart) return;
+  kiesKaart = L.map('kies-kaart').setView([52.2, 5.3], 6);
+  tegels().addTo(kiesKaart);
+  kiesKaart.on('click', e => zetLocatie(e.latlng.lat, e.latlng.lng, false));
+}
+function zetLocatie(lat, lng, centreer = true) {
+  $('#f-lat').value = lat == null ? '' : (+lat).toFixed(5);
+  $('#f-lng').value = lng == null ? '' : (+lng).toFixed(5);
+  if (lat == null || lng == null) { if (kiesMarker) { kiesMarker.remove(); kiesMarker = null; } return; }
+  if (kiesMarker) kiesMarker.setLatLng([lat, lng]); else kiesMarker = L.marker([lat, lng]).addTo(kiesKaart);
+  if (centreer) kiesKaart.setView([lat, lng], Math.max(kiesKaart.getZoom(), 8));
+}
+['#f-lat', '#f-lng'].forEach(s => $(s).addEventListener('change', () => {
+  const la = getal($('#f-lat').value), ln = getal($('#f-lng').value); if (la != null && ln != null) zetLocatie(la, ln);
+}));
+
+function toonVoorbeeld() {
+  const src = uploadData || $('#f-afb').value.trim(), img = $('#f-voorbeeld');
+  img.hidden = !src;
+  if (src) zetAfbeelding(img, { afbeelding: src, reserve: $('#f-reserve').value });
+}
+$('#f-afb').addEventListener('input', () => { uploadData = null; toonVoorbeeld(); });
+$('#knop-upload').addEventListener('click', () => $('#f-upload').click());
+$('#f-upload').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const lezer = new FileReader();
+  lezer.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      // verkleinen zodat de browseropslag niet volloopt
+      const max = 1280, s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      uploadData = c.toDataURL('image/jpeg', 0.82);
+      $('#f-afb').value = ''; $('#f-afb').placeholder = `(geüpload: ${file.name})`; $('#f-reserve').value = '';
+      toonVoorbeeld();
+    };
+    img.src = lezer.result;
+  };
+  lezer.readAsDataURL(file);
+  e.target.value = '';
+});
+
+$('#knop-zoek-plaats').addEventListener('click', async () => {
+  const q = $('#f-plaats').value.trim(); if (!q) return;
+  $('#f-melding').textContent = 'Plaats zoeken…';
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=nl&q=' + encodeURIComponent(q));
+    const d = await r.json();
+    if (!d.length) { $('#f-melding').textContent = 'Plaats niet gevonden. Klik zelf op de kaart.'; return; }
+    zetLocatie(+d[0].lat, +d[0].lon); $('#f-melding').textContent = '';
+  } catch (e) { $('#f-melding').textContent = 'Zoeken lukte niet. Klik zelf op de kaart.'; }
+});
+
+function vulFormulier(b) {
+  uploadData = b.afbeelding?.startsWith('data:') ? b.afbeelding : null;
+  $('#f-id').value = b.id || '';
+  $('#f-titel').value = b.titel || '';
+  $('#f-afb').value = uploadData ? '' : (b.afbeelding || '');
+  $('#f-afb').placeholder = uploadData ? '(geüploade afbeelding)' : 'https://…';
+  $('#f-reserve').value = b.reserve || '';
+  $('#f-jaar').value = Number.isFinite(b.jaar) ? b.jaar : '';
+  $('#f-labels').value = (b.labels || []).join(', ');
+  $('#f-plaats').value = b.plaats || '';
+  $('#f-beschrijving').value = b.beschrijving || '';
+  $('#f-maker').value = b.maker || '';
+  $('#f-licentie').value = b.licentie || '';
+  $('#f-bron-url').value = b.bronUrl || '';
+  $('#f-melding').textContent = '';
+  zetLocatie(getal(b.lat), getal(b.lng));
+  toonVoorbeeld();
+}
+function leegFormulier() { vulFormulier({}); $('#f-voorbeeld').hidden = true; }
+$('#knop-leeg').addEventListener('click', leegFormulier);
+$('#knop-nieuw').addEventListener('click', () => { leegFormulier(); kiesTab('formulier'); $('#f-titel').focus(); });
+
+$('#knop-opslaan').addEventListener('click', () => {
+  const afb = uploadData || $('#f-afb').value.trim();
+  const jaar = parseInt($('#f-jaar').value, 10);
+  if (!afb) { $('#f-melding').textContent = 'Voeg een afbeelding toe (link of upload).'; return; }
+  if (!Number.isFinite(jaar)) { $('#f-melding').textContent = 'Vul een jaartal in.'; return; }
+  const b = {
+    id: $('#f-id').value || uid(),
+    titel: $('#f-titel').value.trim(),
+    afbeelding: afb,
+    reserve: $('#f-reserve').value || undefined,
+    jaar,
+    plaats: $('#f-plaats').value.trim(),
+    lat: getal($('#f-lat').value), lng: getal($('#f-lng').value),
+    beschrijving: $('#f-beschrijving').value.trim(),
+    maker: $('#f-maker').value.trim(),
+    licentie: $('#f-licentie').value.trim(),
+    bronUrl: $('#f-bron-url').value.trim(),
+    labels: $('#f-labels').value.split(',').map(s => s.trim()).filter(Boolean),
+  };
+  const i = bronnen.findIndex(x => x.id === b.id);
+  const oud = i >= 0 ? bronnen[i] : null;
+  if (i >= 0) bronnen[i] = b; else bronnen.push(b);
+  if (!bewaar()) { if (oud) bronnen[i] = oud; else bronnen.pop(); return; }
+  toonLijst(); leegFormulier();
+  $('#f-melding').textContent = heeftPlaats(b) ? 'Opgeslagen ✓' : 'Opgeslagen ✓ (zonder locatie: alleen bruikbaar als "plaats raden" uit staat)';
+});
+
+/* =====================================================================
+   BEHEER: ZOEKEN IN ARCHIEVEN
+   ===================================================================== */
+function kiesTab(naam) {
+  $$('.tabs button').forEach(b => b.classList.toggle('actief', b.dataset.tab === naam));
+  ['formulier', 'zoeken', 'kleio'].forEach(t => $('#tab-' + t).hidden = naam !== t);
+  if (naam === 'formulier' && kiesKaart) setTimeout(() => kiesKaart.invalidateSize(), 0);
+}
+$$('.tabs button').forEach(b => b.addEventListener('click', () => kiesTab(b.dataset.tab)));
+CONFIG.zoekBronnen.forEach((z, i) => $('#z-bron').add(new Option(z.naam, i)));
+
+let zoekResultaten = [];
+$('#knop-zoek').addEventListener('click', zoek);
+$('#z-term').addEventListener('keydown', e => { if (e.key === 'Enter') zoek(); });
+async function zoek() {
+  const q = $('#z-term').value.trim(); if (!q) return;
+  const bron = CONFIG.zoekBronnen[+$('#z-bron').value];
+  $('#z-melding').textContent = 'Zoeken…'; $('#z-resultaten').innerHTML = '';
+  try {
+    zoekResultaten = bron.type === 'commons' ? await zoekCommons(q)
+      : bron.type === 'kleio' ? await zoekKleio(q)
+      : await zoekEuropeana(q, bron.aanbieder);
+    $('#z-melding').textContent = zoekResultaten.length ? `${zoekResultaten.length} resultaten` : 'Niets gevonden. Probeer andere zoekwoorden.';
+    $('#z-resultaten').innerHTML = zoekResultaten.map((r, i) => `
+      <div class="resultaat">
+        <img src="${esc(r.thumb || r.afbeelding)}" alt="" loading="lazy">
+        <div class="r-tekst"><b>${esc((r.titel || '').slice(0, 80))}</b><br>
+          <span class="zacht">${r.jaar ? esc(r.jaar) : 'jaar ?'}${heeftPlaats(r) ? ' · 📍' : ''}</span></div>
+        <button class="klein" data-overnemen="${i}">Overnemen</button>
+      </div>`).join('');
+  } catch (e) {
+    $('#z-melding').textContent = 'Zoeken mislukt: ' + e.message;
+  }
+}
+$('#z-resultaten').addEventListener('click', e => {
+  const k = e.target.closest('[data-overnemen]'); if (!k) return;
+  const r = zoekResultaten[+k.dataset.overnemen];
+  vulFormulier({ ...r, id: r.id || '' });
+  kiesTab('formulier');
+  const mist = [!r.jaar && 'jaartal', !heeftPlaats(r) && 'locatie'].filter(Boolean);
+  $('#f-melding').textContent = mist.length ? `Overgenomen. Vul nog aan: ${mist.join(' en ')}. Controleer alles en klik op Opslaan.` : 'Overgenomen. Controleer jaar en plaats en klik op Opslaan.';
+});
+
+async function zoekCommons(q) {
+  const p = new URLSearchParams({
+    action: 'query', format: 'json', origin: '*', generator: 'search', gsrsearch: q + ' filetype:bitmap',
+    gsrnamespace: '6', gsrlimit: '30', prop: 'imageinfo|coordinates', iiprop: 'url|extmetadata', iiurlwidth: '1280',
+    iiextmetadatafilter: 'ObjectName|ImageDescription|DateTimeOriginal|Artist|Credit|LicenseShortName|GPSLatitude|GPSLongitude',
+  });
+  const d = await (await fetch('https://commons.wikimedia.org/w/api.php?' + p)).json();
+  const pages = Object.values(d.query?.pages || {}).sort((a, b) => a.index - b.index);
+  return pages.map(pg => {
+    const ii = pg.imageinfo?.[0] || {}, m = ii.extmetadata || {}, v = k => htmlNaarTekst(m[k]?.value);
+    return {
+      titel: v('ObjectName') || pg.title.replace(/^File:/, '').replace(/\.\w+$/, '').replace(/_/g, ' '),
+      afbeelding: ii.thumburl || ii.url, thumb: ii.thumburl || ii.url,
+      jaar: vindJaar(v('DateTimeOriginal')),
+      lat: pg.coordinates?.[0]?.lat ?? getal(v('GPSLatitude')), lng: pg.coordinates?.[0]?.lon ?? getal(v('GPSLongitude')),
+      beschrijving: v('ImageDescription').slice(0, 800),
+      maker: [v('Artist'), 'Wikimedia Commons'].filter(Boolean).join(' / '),
+      licentie: v('LicenseShortName'), bronUrl: ii.descriptionurl,
+    };
+  }).filter(r => r.afbeelding);
+}
+
+function licentieNaam(uri = '') {
+  if (/publicdomain\/mark/.test(uri)) return 'Publiek domein';
+  if (/publicdomain\/zero/.test(uri)) return 'CC0';
+  const m = uri.match(/licenses\/([a-z-]+)\//); if (m) return 'CC ' + m[1].toUpperCase();
+  if (/InC|rightsstatements/.test(uri)) return 'Rechten voorbehouden — controleer';
+  return uri;
+}
+async function zoekEuropeana(q, aanbieder) {
+  const p = new URLSearchParams({ wskey: CONFIG.europeanaKey, query: q, rows: '30', media: 'true', thumbnail: 'true', reusability: 'open', profile: 'rich' });
+  p.append('qf', 'TYPE:IMAGE');
+  if (aanbieder) p.append('qf', `DATA_PROVIDER:"${aanbieder}"`);
+  const d = await (await fetch('https://api.europeana.eu/record/v2/search.json?' + p)).json();
+  if (d.success === false) throw new Error(d.error || 'Europeana gaf een fout');
+  const eerste = x => Array.isArray(x) ? x[0] : x;
+  // Europeana levert vaak alleen een kleine preview; haal daaruit de link naar het origineel
+  const groot = it => {
+    let u = eerste(it.edmIsShownBy) || '';
+    if (!u || u.includes('/thumbnail/')) { try { u = new URL(eerste(it.edmPreview)).searchParams.get('uri') || u; } catch (e) {} }
+    return u.replace('/full/max/', '/full/1600,/');   // IIIF-archieven: niet groter dan nodig
+  };
+  return (d.items || []).map(it => ({
+    titel: eerste(it.title) || '',
+    afbeelding: groot(it) || eerste(it.edmPreview),
+    reserve: eerste(it.edmPreview), thumb: eerste(it.edmPreview),
+    jaar: vindJaar((it.year || []).join(' ')) ?? vindJaar(eerste(it.title)) ?? vindJaar(eerste(it.dcDescription)),
+    lat: getal(eerste(it.edmPlaceLatitude)), lng: getal(eerste(it.edmPlaceLongitude)),
+    plaats: eerste(it.edmPlaceLabel)?.def || '',
+    beschrijving: (eerste(it.dcDescription) || '').slice(0, 800),
+    maker: [eerste(it.dcCreator), eerste(it.dataProvider)].filter(Boolean).join(' / '),
+    licentie: licentieNaam(eerste(it.rights)),
+    bronUrl: it.guid || eerste(it.edmIsShownAt),
+  })).filter(r => r.afbeelding);
+}
+
+/* =====================================================================
+   VGN KLEIO
+   ===================================================================== */
+let kleioTermen = null;
+async function laadKleioTermen() {
+  if (kleioTermen) return kleioTermen;
+  kleioTermen = {};
+  for (const tax of ['kleio_tijd', 'kleio_ruimte', 'type_bronn', 'onderbouw_bovenbouw']) {
+    const lijst = await (await fetch(`${CONFIG.kleioApi}/${tax}?per_page=100&_fields=id,name,parent`)).json();
+    lijst.forEach(t => kleioTermen[t.id] = { naam: htmlNaarTekst(t.name), ouder: t.parent });
+  }
+  return kleioTermen;
+}
+
+// Zoek een jaartal in de titel en daarna in de tekst, binnen het tijdvak dat Kleio aangeeft
+function kleioJaar(titel, tekst, bereiken) {
+  const past = j => !bereiken.length || bereiken.some(([a, b]) => j >= a - 1 && j <= b + 1);
+  const re = /(?<![\d.,])(\d{2,4})(\s*(?:v\.\s?Chr|voor Christus))?(?![\d.,])(?!\s*(?:km|kilometer|meter|m\b|kg|kilo|%|procent|mensen|soldaten|man\b|doden|inwoners|gulden|euro))/gi;
+  for (const s of [titel, tekst]) for (const m of s.matchAll(re)) {
+    let j = +m[1];
+    if (m[2]) j = -j; else if (j < 100) continue;
+    if (j <= new Date().getFullYear() && past(j)) return j;
+  }
+  return null;
+}
+
+function kleioNaarBron(p, T) {
+  const html = p.content?.rendered || '';
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const img = [...doc.querySelectorAll('img')].map(i => i.getAttribute('data-src') || i.getAttribute('src')).find(s => /^https?:/.test(s || ''));
+  if (!img) return null;
+  const titel = htmlNaarTekst(p.title?.rendered);
+  const tekst = doc.body.textContent.replace(/\s+/g, ' ').trim();
+  const tijden = (p.kleio_tijd || []).map(id => T[id]?.naam).filter(Boolean);
+  const bereiken = tijden.map(n => KLEIO_TIJD[n]).filter(Boolean);
+  // levensjaren tussen haakjes, zoals "(1668-1738)", overslaan
+  const jaar = kleioJaar(titel, tekst.replace(/\([^)]*\)/g, ' '), bereiken);
+  // regio: liefst de meest specifieke (bijv. Groningen boven Nederland)
+  const ruimtes = (p.kleio_ruimte || []).map(id => T[id]).filter(Boolean);
+  const regio = ruimtes.find(r => r.ouder && KLEIO_PLEK[r.naam]) || ruimtes.find(r => KLEIO_PLEK[r.naam]);
+  const plek = regio ? KLEIO_PLEK[regio.naam] : null;
+  const soorten = [...(p.type_bronn || []), ...(p.onderbouw_bovenbouw || [])].map(id => T[id]?.naam).filter(Boolean);
+  return {
+    id: 'kleio-' + p.id,
+    titel, afbeelding: img, thumb: img, jaar,
+    plaats: regio ? regio.naam + ' (regio)' : '',
+    lat: plek ? plek[0] : null, lng: plek ? plek[1] : null,
+    beschrijving: tekst.slice(0, 600) + (tekst.length > 600 ? '…' : ''),
+    maker: 'VGN Kleio', licentie: '', bronUrl: p.link,
+    labels: ['VGN Kleio', ...tijden, ...soorten],
+    controleren: true,
+  };
+}
+
+async function zoekKleio(q) {
+  const T = await laadKleioTermen();
+  const p = new URLSearchParams({ search: q, per_page: '30', type_bronn: KLEIO_BEELDTYPES.map(t => t.id).join(','),
+    _fields: 'id,title,link,content,kleio_tijd,kleio_ruimte,type_bronn,onderbouw_bovenbouw' });
+  const d = await (await fetch(`${CONFIG.kleioApi}/bronnen?${p}`)).json();
+  return d.map(x => kleioNaarBron(x, T)).filter(Boolean);
+}
+
+$('#k-types').innerHTML = KLEIO_BEELDTYPES.map(t =>
+  `<label style="display:inline-block;margin:2px 12px 2px 0;color:var(--inkt)"><input type="checkbox" value="${t.id}" checked style="width:auto"> ${esc(t.naam)}</label>`).join('');
+
+$('#knop-kleio').addEventListener('click', async () => {
+  const types = $$('#k-types input:checked').map(i => i.value);
+  if (!types.length) { $('#k-melding').textContent = 'Kies minstens één soort bron.'; return; }
+  const knop = $('#knop-kleio'); knop.disabled = true;
+  const melding = t => $('#k-melding').textContent = t;
+  try {
+    melding('Categorieën ophalen…');
+    const T = await laadKleioTermen();
+    const opgehaald = [];
+    let pagina = 1, paginas = 1;
+    do {
+      melding(`Bronnen ophalen… pagina ${pagina} van ${paginas}`);
+      const p = new URLSearchParams({ per_page: '100', page: pagina, type_bronn: types.join(','),
+        _fields: 'id,title,link,content,kleio_tijd,kleio_ruimte,type_bronn,onderbouw_bovenbouw' });
+      const r = await fetch(`${CONFIG.kleioApi}/bronnen?${p}`);
+      if (!r.ok) throw new Error('Kleio antwoordde met ' + r.status);
+      paginas = +r.headers.get('X-WP-TotalPages') || 1;
+      opgehaald.push(...await r.json());
+      pagina++;
+    } while (pagina <= paginas);
+
+    const zonderJaar = $('#k-zonder-jaar').checked;
+    const voor = bronnen.map(b => b);
+    let nieuw = 0, bijgewerkt = 0, overgeslagen = 0, gecontroleerd = 0;
+    for (const p of opgehaald) {
+      const b = kleioNaarBron(p, T);
+      if (!b || (!b.jaar && !zonderJaar)) { overgeslagen++; continue; }
+      const i = bronnen.findIndex(x => x.id === b.id);
+      if (i < 0) { bronnen.push(b); nieuw++; }
+      else if (bronnen[i].controleren) { bronnen[i] = b; bijgewerkt++; }
+      else gecontroleerd++;   // door jou gecontroleerd: niet overschrijven
+    }
+    if (bewaar()) {
+      toonLijst();
+      melding(`Klaar: ${nieuw} nieuw, ${bijgewerkt} bijgewerkt, ${gecontroleerd} al gecontroleerd (ongemoeid gelaten), ${overgeslagen} overgeslagen (geen afbeelding of geen jaartal gevonden).`);
+    } else { bronnen = voor; melding('Niet opgeslagen: te weinig ruimte. Kies minder soorten bronnen.'); }
+  } catch (e) {
+    melding('Importeren mislukt: ' + e.message);
+  }
+  knop.disabled = false;
+});
+
+/* ===================================================================== */
+toon('start');
+laadVasteCollectie();
+</script>
+</body>
+</html>
