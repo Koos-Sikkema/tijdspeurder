@@ -7,26 +7,43 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  /* ====== KLEUREN EN OPMAAK — pas gerust aan ====== */
+  /* ====== HUISSTIJL "BRONNEN IN DE KLAS" — kleuren en lettertypen ======
+     Groen #2E7160 en rood #C20E1A; koppen in Lexicon No2, tekst in TheSans.
+     Lexicon en TheSans zijn licentie-lettertypen: ze worden gebruikt als ze op de computer
+     staan, anders valt de pagina terug op Georgia / Segoe UI. */
   :root {
-    --papier: #f6f1e7;
-    --kaart: #fffdf8;
-    --inkt: #2b2a27;
-    --zacht: #6b665c;
-    --lijn: #ddd5c4;
-    --accent: #b5532d;
-    --accent-donker: #8f3e20;
-    --goed: #3d7a4a;
+    --groen: #2E7160;
+    --groen-donker: #235748;
+    --groen-licht: #e7f0ed;
+    --rood: #C20E1A;
+    --papier: #f3f6f5;
+    --kaart: #ffffff;
+    --inkt: #1d2a26;
+    --zacht: #5a6a65;
+    --lijn: #d3dfdb;
+    --accent: var(--groen);
+    --accent-donker: var(--groen-donker);
+    --goed: var(--groen);
     --radius: 10px;
+    --kop: "Lexicon No2", "Lexicon No2 Roman", "Lexicon", Georgia, "Times New Roman", serif;
+    --tekst: "TheSans", "TheSans Plain", "TheSansOffice", "Segoe UI", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif; background: var(--papier); color: var(--inkt); }
-  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--inkt); color: var(--papier); flex-wrap: wrap; }
-  header h1 { font-family: Georgia, serif; font-size: 22px; margin: 0; margin-right: auto; letter-spacing: .5px; }
-  header nav button { background: transparent; color: var(--papier); border: 1px solid transparent; }
-  header nav button.actief { border-color: var(--papier); }
+  body { margin: 0; font-family: var(--tekst); background: var(--papier); color: var(--inkt); }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--kaart); border-bottom: 4px solid var(--groen); flex-wrap: wrap; }
+  .logo { margin-right: auto; display: flex; align-items: center; gap: 16px; text-decoration: none; }
+  .logo-beeld { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+  .logo-bronnen { font-family: var(--kop); color: var(--groen); font-size: 30px; letter-spacing: 1px; }
+  .logo-o { position: relative; display: inline-block; }
+  .logo-o::after { content: ""; position: absolute; left: 50%; top: 52%; width: .16em; height: .16em; border-radius: 50%; background: var(--rood); transform: translate(-50%, -50%); }
+  .logo-klas { font-family: var(--tekst); font-weight: 700; color: var(--rood); font-size: 15px; letter-spacing: .5px; margin-top: 2px; }
+  .logo-app { font-family: var(--kop); color: var(--inkt); font-size: 20px; padding-left: 16px; border-left: 1px solid var(--lijn); }
+  header nav button { background: transparent; color: var(--groen); border: 1px solid transparent; font-weight: 600; }
+  header nav button.actief { border-color: var(--groen); background: var(--groen-licht); }
   main { max-width: 1300px; margin: 0 auto; padding: 20px 16px 60px; }
-  h2 { font-family: Georgia, serif; margin-top: 0; }
+  h2, h3 { font-family: var(--kop); color: var(--groen); margin-top: 0; font-weight: normal; }
+  footer { text-align: center; color: var(--zacht); font-size: 13px; padding: 0 16px 30px; }
+  footer a { color: var(--groen); }
   button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--lijn); background: var(--kaart); color: var(--inkt); cursor: pointer; }
   button:hover { border-color: var(--zacht); }
   button.hoofd { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
@@ -53,7 +70,7 @@
   .spel-kop { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
   .afb-kader { background: #1d1c1a; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; min-height: 300px; max-height: 72vh; overflow: hidden; cursor: zoom-in; }
   .afb-kader img { max-width: 100%; max-height: 72vh; object-fit: contain; display: block; }
-  .jaar-groot { font-family: Georgia, serif; font-size: 40px; text-align: center; margin: 4px 0; }
+  .jaar-groot { font-family: var(--kop); color: var(--groen); font-size: 40px; text-align: center; margin: 4px 0; }
   input[type=range] { padding: 0; accent-color: var(--accent); }
   #spel-kaart, #kies-kaart { height: 320px; border-radius: var(--radius); border: 1px solid var(--lijn); }
   .uitslag-regel { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--lijn); }
@@ -92,7 +109,15 @@
 <body>
 
 <header>
-  <h1>Tijdspeurder</h1>
+  <h1 style="margin:0;margin-right:auto;font-size:inherit">
+    <a class="logo" href="https://www.vgnkleio.nl/bronnen/" target="_blank" rel="noopener" title="Bronnen in de klas — VGN Kleio">
+      <span class="logo-beeld" aria-label="Bronnen in de klas">
+        <span class="logo-bronnen">BR<span class="logo-o">O</span>NNEN</span>
+        <span class="logo-klas">IN DE KLAS</span>
+      </span>
+      <span class="logo-app">Tijdspeurder</span>
+    </a>
+  </h1>
   <nav>
     <button data-naar="start" class="actief">Spelen</button>
     <button data-naar="beheer">Bronnen beheren</button>
@@ -153,7 +178,7 @@
           <button class="hoofd" id="knop-raad" style="width:100%">Raad!</button>
         </div>
         <div id="uitslag-paneel" hidden>
-          <h3 id="u-titel" style="font-family:Georgia,serif;margin-top:0"></h3>
+          <h3 id="u-titel"></h3>
           <div class="uitslag-regel"><span id="u-jaar"></span><span class="punten" id="u-jaar-punten"></span></div>
           <div class="uitslag-regel" id="u-plaats-regel"><span id="u-plaats"></span><span class="punten" id="u-plaats-punten"></span></div>
           <div id="u-kaart-plek"></div>
@@ -283,6 +308,8 @@
   </section>
 </main>
 
+<footer>Tijdspeurder is onderdeel van <a href="https://www.vgnkleio.nl/bronnen/" target="_blank" rel="noopener">Bronnen in de klas</a> (VGN Kleio)</footer>
+
 <div id="zoom" hidden><img alt=""></div>
 
 <script>
@@ -324,7 +351,30 @@ const KLEIO_TIJD = {
   'Late middeleeuwen': [1000, 1500], '16e eeuw': [1500, 1599], '17e eeuw': [1600, 1699],
   '18e eeuw': [1700, 1799], '19e eeuw': [1800, 1899], '20e eeuw': [1900, 1999], '21e eeuw': [2000, 2030],
 };
-// Middelpunt per regio uit Kleio (de plaats is dus bij benadering!)
+// Hoofdstad per land en provincie uit Kleio: [breedte, lengte, stad].
+// Bronnen die alleen op land/provincie zijn ingedeeld, komen op de hoofdstad te staan.
+const KLEIO_HOOFDSTAD = {
+  'Australië': [-35.28, 149.13, 'Canberra'], 'Bangladesh': [23.81, 90.41, 'Dhaka'], 'België': [50.85, 4.35, 'Brussel'],
+  'Bosnië en Herzegovina': [43.86, 18.41, 'Sarajevo'], 'Brazilië': [-15.79, -47.88, 'Brasília'], 'China': [39.90, 116.41, 'Peking'],
+  'Cuba': [23.11, -82.37, 'Havana'], 'Denemarken': [55.68, 12.57, 'Kopenhagen'], 'Duitsland': [52.52, 13.40, 'Berlijn'],
+  'Egypte': [30.04, 31.24, 'Caïro'], 'Frankrijk': [48.86, 2.35, 'Parijs'], 'Griekenland': [37.98, 23.73, 'Athene'],
+  'Groot-Brittannië': [51.51, -0.13, 'Londen'], 'Hongarije': [47.50, 19.04, 'Boedapest'], 'Ierland': [53.35, -6.26, 'Dublin'],
+  'India': [28.61, 77.21, 'New Delhi'], 'Indonesië': [-6.21, 106.85, 'Jakarta'], 'Irak': [33.31, 44.37, 'Bagdad'],
+  'Iran': [35.69, 51.39, 'Teheran'], 'Israël': [31.77, 35.21, 'Jeruzalem'], 'Italië': [41.90, 12.50, 'Rome'],
+  'Japan': [35.68, 139.69, 'Tokio'], 'Korea': [37.57, 126.98, 'Seoul'], 'Marokko': [34.02, -6.83, 'Rabat'],
+  'Nederland': [52.37, 4.90, 'Amsterdam'], 'Noorwegen': [59.91, 10.75, 'Oslo'], 'Oostenrijk': [48.21, 16.37, 'Wenen'],
+  'Polen': [52.23, 21.01, 'Warschau'], 'Portugal': [38.72, -9.14, 'Lissabon'], 'Rusland': [55.76, 37.62, 'Moskou'],
+  'Spanje': [40.42, -3.70, 'Madrid'], 'Suriname': [5.85, -55.20, 'Paramaribo'], 'Turkije': [39.93, 32.86, 'Ankara'],
+  'Verenigde Staten': [38.90, -77.04, 'Washington'], 'Vietnam': [21.03, 105.85, 'Hanoi'], 'Zuid-Afrika': [-25.75, 28.19, 'Pretoria'],
+  'Zuid-Arfika': [-25.75, 28.19, 'Pretoria'], 'Zweden': [59.33, 18.07, 'Stockholm'], 'Zwitserland': [46.95, 7.45, 'Bern'],
+  // Nederlandse provincies
+  'Drenthe': [52.99, 6.56, 'Assen'], 'Flevoland': [52.52, 5.47, 'Lelystad'], 'Friesland': [53.20, 5.80, 'Leeuwarden'],
+  'Gelderland': [51.98, 5.91, 'Arnhem'], 'Groningen': [53.22, 6.57, 'Groningen'], 'Limburg': [50.85, 5.69, 'Maastricht'],
+  'Noord-Brabant': [51.69, 5.30, "'s-Hertogenbosch"], 'Noord-Holland': [52.38, 4.64, 'Haarlem'], 'Overijssel': [52.52, 6.08, 'Zwolle'],
+  'Utrecht': [52.09, 5.12, 'Utrecht'], 'Zeeland': [51.50, 3.61, 'Middelburg'], 'Zuid-Holland': [52.08, 4.30, 'Den Haag'],
+};
+// Middelpunt per regio: alleen nog gebruikt voor werelddelen en gebieden zonder hoofdstad
+// (Europa, Afrika, Azië, Midden-Oosten, ...) en om oude imports te herkennen.
 const KLEIO_PLEK = {
   'Afrika': [2, 20], 'Australië': [-25, 134], 'Azië': [34, 100], 'Bangladesh': [23.7, 90.4], 'België': [50.6, 4.6],
   'Bosnië en Herzegovina': [44, 17.8], 'Brazilië': [-10, -52], 'Caraïbisch Gebied': [18, -72], 'China': [35, 104],
@@ -459,10 +509,11 @@ HISTORISCHE_CONTEXTEN.forEach(hc => hc.deelvragen.forEach(dv => {
 }));
 function inGebied(b, sleutels) {
   if (!sleutels || !sleutels.length) return false;
-  const regio = (b.plaats || '').match(/^(.*) \(regio\)$/);   // Kleio: alleen een regio bekend
+  // Kleio: alleen land/provincie/regio bekend → op naam vergelijken
+  const regio = b.regio || ((b.plaats || '').match(/^(.*) \(regio\)$/) || [])[1];
   return sleutels.some(k => {
     const g = GEBIEDEN[k]; if (!g) return false;
-    if (regio) return g.namen.includes(regio[1]);
+    if (regio) return g.namen.includes(regio);
     return heeftPlaats(b) && g.vakken.some(([z, n, w, o]) => b.lat >= z && b.lat <= n && b.lng >= w && b.lng <= o);
   });
 }
@@ -590,6 +641,7 @@ function bewaar() {
 }
 bronnen = laad();
 if (!bronnen) { bronnen = VOORBEELDEN.map(b => ({ ...b, id: uid() })); bewaar(); }
+else if (kleioHoofdstedenBijwerken(bronnen)) bewaar();
 
 /* Online versie: staat er een bestand collectie.json naast index.html, dan krijgt iedereen
    (dus ook leerlingen) automatisch die collectie. Wijzigingen die iemand zelf maakt, blijven
@@ -603,6 +655,7 @@ async function laadVasteCollectie() {
     const vast = Array.isArray(data) ? data : data.bronnen;
     if (!Array.isArray(vast) || !vast.length) return;
     vast.forEach((b, i) => { b.id = b.id || 'c' + i; });
+    kleioHoofdstedenBijwerken(vast);
     vasteCollectie = new Map(vast.map(b => [b.id, JSON.stringify(b)]));
     let eigen = null;
     try { eigen = JSON.parse(localStorage.getItem(OPSLAG + '.eigen') || 'null'); } catch (e) {}
@@ -745,8 +798,8 @@ $('#knop-raad').addEventListener('click', () => {
     r.pp = Math.round(CONFIG.maxPlaatsPunten * Math.exp(-r.km / CONFIG.afstandStrengheid));
     $('#u-plaats').innerHTML = `<b>${esc(b.plaats || 'Locatie')}</b> — ${r.km < 1 ? 'minder dan 1 km' : Math.round(r.km).toLocaleString('nl-NL') + ' km'} ernaast`;
     $('#u-plaats-punten').textContent = '+' + r.pp.toLocaleString('nl-NL');
-    const juist = L.circleMarker(echt, { radius: 9, color: '#3d7a4a', fillColor: '#3d7a4a', fillOpacity: .9 }).addTo(spelLagen).bindTooltip('Hier was het');
-    L.polyline([gok, echt], { color: '#b5532d', dashArray: '6 6' }).addTo(spelLagen);
+    const juist = L.circleMarker(echt, { radius: 9, color: '#2E7160', fillColor: '#2E7160', fillOpacity: .9 }).addTo(spelLagen).bindTooltip('Hier was het');
+    L.polyline([gok, echt], { color: '#C20E1A', dashArray: '6 6' }).addTo(spelLagen);
     $('#u-kaart-plek').appendChild($('#spel-kaart'));
     setTimeout(() => { spelKaart.invalidateSize(); spelKaart.fitBounds(L.latLngBounds([gok, echt]).pad(0.3), { maxZoom: 10 }); }, 0);
   } else r.pp = 0;
@@ -1120,19 +1173,43 @@ function kleioNaarBron(p, T) {
   const jaar = kleioJaar(titel, tekst.replace(/\([^)]*\)/g, ' '), bereiken);
   // regio: liefst de meest specifieke (bijv. Groningen boven Nederland)
   const ruimtes = (p.kleio_ruimte || []).map(id => T[id]).filter(Boolean);
-  const regio = ruimtes.find(r => r.ouder && KLEIO_PLEK[r.naam]) || ruimtes.find(r => KLEIO_PLEK[r.naam]);
-  const plek = regio ? KLEIO_PLEK[regio.naam] : null;
+  const bekend = r => KLEIO_HOOFDSTAD[r.naam] || KLEIO_PLEK[r.naam];
+  const regio = ruimtes.find(r => r.ouder && bekend(r)) || ruimtes.find(r => KLEIO_HOOFDSTAD[r.naam]) || ruimtes.find(bekend);
+  const plek = regio ? kleioLocatie(regio.naam) : null;
   const soorten = [...(p.type_bronn || []), ...(p.onderbouw_bovenbouw || [])].map(id => T[id]?.naam).filter(Boolean);
   return {
     id: 'kleio-' + p.id,
     titel, afbeelding: img, thumb: img, jaar,
-    plaats: regio ? regio.naam + ' (regio)' : '',
-    lat: plek ? plek[0] : null, lng: plek ? plek[1] : null,
+    plaats: plek ? plek.plaats : '', regio: regio ? regio.naam : undefined,
+    lat: plek ? plek.lat : null, lng: plek ? plek.lng : null,
     beschrijving: tekst.slice(0, 600) + (tekst.length > 600 ? '…' : ''),
     maker: 'VGN Kleio', licentie: '', bronUrl: p.link,
     labels: ['VGN Kleio', ...tijden, ...soorten],
     controleren: true,
   };
+}
+
+// Locatie voor een Kleio-regio: de hoofdstad als die bekend is, anders het middelpunt van het gebied
+function kleioLocatie(naam) {
+  const h = KLEIO_HOOFDSTAD[naam];
+  if (h) return { lat: h[0], lng: h[1], plaats: `${h[2]} (hoofdstad van ${naam})` };
+  const m = KLEIO_PLEK[naam];
+  return m ? { lat: m[0], lng: m[1], plaats: `${naam} (regio)` } : null;
+}
+// Oudere imports stonden op het middelpunt van het land/de provincie: zet die op de hoofdstad.
+// Bronnen die je zelf hebt verplaatst (andere coördinaten) blijven ongemoeid.
+function kleioHoofdstedenBijwerken(lijst) {
+  let n = 0;
+  (lijst || []).forEach(b => {
+    const m = (b.plaats || '').match(/^(.*) \(regio\)$/);
+    if (!m || !KLEIO_HOOFDSTAD[m[1]]) return;
+    const oud = KLEIO_PLEK[m[1]];
+    if (oud && (Math.abs(b.lat - oud[0]) > 0.001 || Math.abs(b.lng - oud[1]) > 0.001)) return;
+    const nieuw = kleioLocatie(m[1]);
+    Object.assign(b, { lat: nieuw.lat, lng: nieuw.lng, plaats: nieuw.plaats, regio: m[1] });
+    n++;
+  });
+  return n;
 }
 
 async function zoekKleio(q) {
